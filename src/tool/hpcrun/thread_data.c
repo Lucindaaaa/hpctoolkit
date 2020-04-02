@@ -232,6 +232,12 @@ core_profile_trace_data_init(core_profile_trace_data_t * cptd, int id, cct_ctxt_
   hpcrun_cct2metrics_init(&(cptd->cct2metrics_map));
 
   // ----------------------------------------
+  // yumeng: cct_metricid_threads_values sparse matrix 
+  // ----------------------------------------
+  //cptd->sparse_metrics_values = hpcrun_malloc(sizeof(cct_metrics_tid_sparse_data_t));
+  //cptd->sparse_metrics_values.tid = id;
+
+  // ----------------------------------------
   // tracing
   // ----------------------------------------
   cptd->trace_min_time_us = 0;

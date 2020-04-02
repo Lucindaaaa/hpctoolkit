@@ -11,6 +11,19 @@
 
 enum perf_ksym_e {PERF_UNDEFINED, PERF_AVAILABLE, PERF_UNAVAILABLE} ;
 
+#if 0 /*yumeng*/
+typedef struct output_metric_id_offset_t{
+  uint16_t id;
+  uint64_t offset;
+}output_metric_id_offset_t;
+
+typedef struct cct_metrics_tid_sparse_data_t {
+  hpcrun_metricVal_t* vals;
+  int tid;
+  output_metric_id_offset_t* metric_id_offsets;
+  uint64_t* cct_offsets;
+}cct_metrics_tid_sparse_data_t;
+#endif 
 
 typedef struct core_profile_trace_data_t {
   int id;
@@ -22,6 +35,9 @@ typedef struct core_profile_trace_data_t {
   //metrics: this is needed otherwise 
   //hpcprof does not pick them up
   cct2metrics_t* cct2metrics_map;
+
+  //yumeng: for constructing cct_metricid_threads_values sparse matrix
+  //cct_metrics_tid_sparse_data_t* sparse_metrics_values;
 
   // for metric scale (openmp uses)
   void (*scale_fn)(void*);

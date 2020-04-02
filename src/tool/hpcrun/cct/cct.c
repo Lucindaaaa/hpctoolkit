@@ -246,6 +246,8 @@ walkset_l(cct_node_t* cct, cct_op_t fn, cct_op_arg_t arg, size_t level)
 typedef struct {
   bool count_dummy;
   size_t n;
+  cct2metrics_t* cct2metrics_map; //yumeng
+  uint64_t num_nzval; //yumeng
 } count_arg_t;
 
 static void
@@ -255,6 +257,12 @@ l_count(cct_node_t* n, cct_op_arg_t arg, size_t level)
   if (hpcrun_cct_is_dummy(n) && !count_arg->count_dummy) {
     return;
   }
+  metric_data_list_t *data_list = 
+    hpcrun_get_metric_data_list_specific(&(count_arg->cct2metrics_map), n);
+
+  //count the number of non-zero values
+  uint64_t num_nzval = hpcrun_metric_sparse_count(data_list);
+  (count_arg->num_nzval) += num_nzval;
 
   (count_arg->n)++;
 }
@@ -279,7 +287,9 @@ typedef struct {
   epoch_flags_t flags;
   hpcrun_fmt_cct_node_t* tmp_node;
   cct2metrics_t* cct2metrics_map;
+  sparse_metrics_t* sparse_metrics; //yumeng
 } write_arg_t;
+
 
 //
 // Merge the metrics of dummy nodes to their parents
@@ -317,6 +327,29 @@ l_dummy(cct_node_t* n, cct_op_arg_t arg, size_t level)
   } 
 }
 
+
+#if 0
+//yumeng
+static void
+lcount_nzval(cct_node_t* node, cct_op_arg_t arg, size_t level)
+{
+  // avoid writing dummy nodes
+  if (!HPCRUN_CCT_KEEP_DUMMY) {
+    if (hpcrun_cct_is_dummy(node)) {
+      return;
+    }
+  }
+
+  sizes_arg_t* my_arg = (sizes_arg_t*) arg;
+  metric_data_list_t *data_list = 
+    hpcrun_get_metric_data_list_specific(&(my_arg->cct2metrics_map), node);
+
+  //count the number of non-zero values
+   uint64_t num_nzval = hpcrun_metric_sparse_count(data_list);
+   (my_arg->num_nzval) += num_nzval;
+}
+#endif
+
 static void
 lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
 {
@@ -345,6 +378,7 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
   }
 
   write_arg_t* my_arg = (write_arg_t*) arg;
+  sparse_metrics_t* sparse_metrics = my_arg->sparse_metrics;
   hpcrun_fmt_cct_node_t* tmp = my_arg->tmp_node;
   epoch_flags_t flags = my_arg->flags;
   cct_addr_t* addr    = hpcrun_cct_addr(node);
@@ -369,6 +403,22 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
   tmp->lm_ip = (hpcfmt_vma_t) (uintptr_t) (addr->ip_norm).lm_ip;
 
 #if 1
+  // yumeng's code
+  //tmp->num_metrics = my_arg->num_kind_metrics;
+  metric_data_list_t *data_list = 
+    hpcrun_get_metric_data_list_specific(&(my_arg->cct2metrics_map), node);
+
+  //set dense copy
+  //tmp->num_metrics = my_arg->num_kind_metrics;
+  //hpcrun_metric_set_dense_copy(tmp->metrics, data_list, my_arg->num_kind_metrics);
+
+  //set_sparse_copy: copy the values into sparse_metrics
+  size_t curr_num_cct = sparse_metrics->num_cct;
+  uint64_t curr_cct_offset = (sparse_metrics->cct_offsets)[curr_num_cct];
+  uint64_t num_nzval = hpcrun_metric_set_sparse_copy(sparse_metrics->values,sparse_metrics->metric_pos, data_list,curr_cct_offset); 
+  (sparse_metrics->cct_offsets)[curr_num_cct + 1] = curr_cct_offset + num_nzval;
+  (sparse_metrics->num_cct)++;
+#elif 0
   // keren's code
   tmp->num_metrics = my_arg->num_kind_metrics;
   metric_data_list_t *data_list = 
@@ -381,6 +431,7 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
 
   hpcrun_metric_set_dense_copy(tmp->metrics, ms, my_arg->num_metrics);
 #endif
+
   hpcrun_fmt_cct_node_fwrite(tmp, flags, my_arg->fs);
 }
 
@@ -754,21 +805,28 @@ hpcrun_cct_insert_path(cct_node_t ** root, cct_node_t* path)
   hpcrun_walk_path(path, l_insert_path, (cct_op_arg_t) root);
 }
 
-
-//
-// Writing operation
-//
+#if 0
 int
 hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epoch_flags_t flags)
+#else
+/*yumeng*/
+int
+hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epoch_flags_t flags, sparse_metrics_t* sparse_metrics)
+#endif
 {
   if (!fs) return HPCRUN_ERR;
 
   size_t nodes = 0;
+  uint64_t num_nzval = 0;
   if (HPCRUN_CCT_KEEP_DUMMY) {
-    nodes = hpcrun_cct_num_nodes(cct, true);
+    nodes = hpcrun_cct_num_nodes(cct, true, &cct2metrics_map,&num_nzval);
   } else {
-    nodes = hpcrun_cct_num_nodes(cct, false);
+    nodes = hpcrun_cct_num_nodes(cct, false, &cct2metrics_map,&num_nzval);
   }
+
+  //yumeng: initialize cct_offsets, last offset will be the total number of values
+  sparse_metrics->cct_offsets = (uint64_t *) hpcrun_malloc((nodes+1)*sizeof(uint64_t));
+  (sparse_metrics->cct_offsets)[0] = 0;
 
   hpcfmt_int8_fwrite((uint64_t) nodes, fs);
   TMSG(DATA_WRITE, "num cct nodes = %d", nodes);
@@ -778,6 +836,27 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
   
   hpcrun_fmt_cct_node_t tmp_node;
 
+#if 0
+//yumeng
+  uint64_t num_nzval1 = 0;
+  sizes_arg_t sizes_arg = {
+    // multithreaded code: add personalized cct2metrics_map for multithreading programs
+    // this is to allow a thread to write the profile data of another thread.
+    .cct2metrics_map = cct2metrics_map,
+    .num_nzval = num_nzval1
+  };
+
+  if (!HPCRUN_CCT_KEEP_DUMMY) {
+    hpcrun_cct_walk_child_1st(cct, collapse_dummy_node, &sizes_arg);
+  }
+  hpcrun_cct_walk_node_1st(cct, lcount_nzval, &sizes_arg);
+#endif
+
+  sparse_metrics->num_vals = num_nzval;
+  sparse_metrics->values = (cct_metric_data_t *) hpcrun_malloc((sparse_metrics->num_vals)*sizeof(cct_metric_data_t));
+  sparse_metrics->metric_pos = (metric_position_t *) hpcrun_malloc((sparse_metrics->num_vals)*sizeof(metric_position_t));
+
+
   write_arg_t write_arg = {
     .num_kind_metrics = num_kind_metrics,
     .fs          = fs,
@@ -786,16 +865,29 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
 
     // multithreaded code: add personalized cct2metrics_map for multithreading programs
     // this is to allow a thread to write the profile data of another thread.
-    .cct2metrics_map = cct2metrics_map
+    .cct2metrics_map = cct2metrics_map,
+
+    /*yumeng pass in and assign value along the way */
+    .sparse_metrics = sparse_metrics
   };
-  
+
+
+/*yumeng*/ 
+#if 0
   hpcrun_metricVal_t metrics[num_kind_metrics];
   tmp_node.metrics = &(metrics[0]);
+#endif
 
   if (!HPCRUN_CCT_KEEP_DUMMY) {
     hpcrun_cct_walk_child_1st(cct, collapse_dummy_node, &write_arg);
   }
   hpcrun_cct_walk_node_1st(cct, lwrite, &write_arg);
+
+#if 1
+//yumeng
+  if(sparse_metrics->num_cct != nodes)printf("\nTEST: number of nodes are not equal if printed. \n");
+  if(sparse_metrics->num_vals != (sparse_metrics->cct_offsets)[nodes])printf("\nTEST: number of nzvals are not equal if printed. \n");
+#endif
 
   return HPCRUN_OK;
 }
@@ -804,13 +896,17 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
 // Utilities
 //
 size_t
-hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy)
+hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy, cct2metrics_t **cct2metrics_map,uint64_t* num_nzval)
 {
   count_arg_t count_arg = {
     .count_dummy = count_dummy,
     .n = 0,
+    .cct2metrics_map = *cct2metrics_map, //yumeng
+    .num_nzval = *num_nzval //yumeng
   };
   hpcrun_cct_walk_node_1st(cct, l_count, &count_arg);
+  *cct2metrics_map = count_arg.cct2metrics_map;
+  *num_nzval = count_arg.num_nzval;
   return count_arg.n;
 }
 
@@ -1106,4 +1202,3 @@ hpcrun_cct_set_parent(cct_node_t* cct, cct_node_t* parent)
     return;
   cct->parent = parent;
 }
-

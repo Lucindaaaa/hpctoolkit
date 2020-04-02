@@ -103,6 +103,31 @@ static const char HPCPROF_MetricDBSfx[] = "metric-db";
 
 static const char HPCPROF_TmpFnmSfx[] = "tmp";
 
+//***************************************************************************
+//YUMENG
+typedef struct hpcrun_sparse_file {
+  FILE* file;
+  size_t footer[7];
+
+  //use for Pause, Resume
+  bool mode; 
+  size_t cur_pos; 
+
+  //keep track for next_xx functions
+  uint32_t cur_cct;
+  size_t cur_metric;
+  uint16_t cur_metric_id; //count the id, metric desc doesn't have it
+  size_t cur_lm;  
+  uint32_t cur_block;
+
+  //to read metric values for current block, initialized when hpcrun_sparse_next_block is called
+  size_t cur_block_end;
+  uint64_t num_nzval;
+  size_t metric_pos_offset; 
+  size_t cct_offset_offset;
+  size_t val_offset; 
+
+} hpcrun_sparse_file_t;
 
 //***************************************************************************
 // hdr
@@ -394,6 +419,7 @@ typedef metric_desc_t* metric_desc_p_t;
 HPCFMT_List_declare(metric_desc_p_t);
 typedef HPCFMT_List(metric_desc_p_t) metric_desc_p_tbl_t; // HPCFMT_List of metric_desc_t*
 
+
 extern int
 hpcrun_fmt_metricTbl_fread(metric_tbl_t* metric_tbl, metric_aux_info_t **aux_info, FILE* in,
 			   double fmtVersion, hpcfmt_alloc_fn alloc);
@@ -456,10 +482,8 @@ typedef struct loadmap_entry_t {
 
 } loadmap_entry_t;
 
-
 HPCFMT_List_declare(loadmap_entry_t);
 typedef HPCFMT_List(loadmap_entry_t) loadmap_t; // hpcrun_loadmap_t
-
 
 extern int
 hpcrun_fmt_loadmap_fread(loadmap_t* loadmap, FILE* infs, hpcfmt_alloc_fn alloc);
@@ -559,10 +583,73 @@ extern int
 hpcrun_fmt_cct_node_fwrite(hpcrun_fmt_cct_node_t* x,
 			   epoch_flags_t flags, FILE* fs);
 
+/*yumeng*/
+#if 0
 extern int
 hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 			   epoch_flags_t flags, const metric_tbl_t* metricTbl,
 			   const char* pre);
+#else
+extern int
+hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
+			   epoch_flags_t flags,const char* pre);
+#endif
+
+//***************************************************************************
+// sparse metrics - YUMENG
+//***************************************************************************
+
+// --------------------------------------------------------------------------
+// hpcrun_fmt_sparse_metrics_t
+// --------------------------------------------------------------------------
+
+#if 1
+/*yumeng*/
+struct hpcrun_fmt_sparse_metrics_t{
+  int tid;
+  uint64_t num_vals;
+  uint64_t num_cct;
+  hpcrun_metricVal_t* values;
+  uint16_t* mid;
+  uint64_t* m_offset;
+  //metric_position_t* metric_pos;
+  uint64_t *cct_offsets;
+};
+
+typedef struct hpcrun_fmt_sparse_metrics_t hpcrun_fmt_sparse_metrics_t;
+
+#endif
+
+
+extern int
+hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+
+extern int
+hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+
+extern int
+hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
+			   const metric_tbl_t* metricTbl, const char* pre);
+
+
+
+// --------------------------------------------------------------------------
+// hpcrun_sparse_file
+// --------------------------------------------------------------------------
+#define OPENED 0
+#define PAUSED 1
+
+hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path);
+int hpcrun_sparse_pause(hpcrun_sparse_file_t* sparse_fs);
+int hpcrun_sparse_resume(hpcrun_sparse_file_t* sparse_fs, const char* path);
+void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs);
+
+int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hdr);
+int hpcrun_sparse_next_lm(hpcrun_sparse_file_t* sparse_fs, loadmap_entry_t* lm);
+int hpcrun_sparse_next_metric(hpcrun_sparse_file_t* sparse_fs, metric_desc_t* m, metric_aux_info_t* perf_info,double fmtVersion);
+int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_node_t* node);
+int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs);
+int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t* val);
 
 
 // --------------------------------------------------------------------------

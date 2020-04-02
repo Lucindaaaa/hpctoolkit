@@ -583,13 +583,13 @@ extern int
 hpcrun_fmt_cct_node_fwrite(hpcrun_fmt_cct_node_t* x,
 			   epoch_flags_t flags, FILE* fs);
 
-/*yumeng*/
 #if 0
 extern int
 hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 			   epoch_flags_t flags, const metric_tbl_t* metricTbl,
 			   const char* pre);
 #else
+//YUMENG: no need to parse metricTbl for sparse format
 extern int
 hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 			   epoch_flags_t flags,const char* pre);
@@ -602,9 +602,6 @@ hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 // --------------------------------------------------------------------------
 // hpcrun_fmt_sparse_metrics_t
 // --------------------------------------------------------------------------
-
-#if 1
-/*yumeng*/
 struct hpcrun_fmt_sparse_metrics_t{
   int tid;
   uint64_t num_vals;
@@ -617,9 +614,6 @@ struct hpcrun_fmt_sparse_metrics_t{
 };
 
 typedef struct hpcrun_fmt_sparse_metrics_t hpcrun_fmt_sparse_metrics_t;
-
-#endif
-
 
 extern int
 hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);

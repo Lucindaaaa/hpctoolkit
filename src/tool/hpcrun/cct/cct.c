@@ -246,8 +246,10 @@ walkset_l(cct_node_t* cct, cct_op_t fn, cct_op_arg_t arg, size_t level)
 typedef struct {
   bool count_dummy;
   size_t n;
-  cct2metrics_t* cct2metrics_map; //yumeng
-  uint64_t num_nzval; //yumeng
+
+  //YUMENG: help count number of non-zero values for each cct
+  cct2metrics_t* cct2metrics_map; 
+  uint64_t num_nzval; 
 } count_arg_t;
 
 static void
@@ -257,10 +259,10 @@ l_count(cct_node_t* n, cct_op_arg_t arg, size_t level)
   if (hpcrun_cct_is_dummy(n) && !count_arg->count_dummy) {
     return;
   }
+
+  //YUMENG: count the number of non-zero values
   metric_data_list_t *data_list = 
     hpcrun_get_metric_data_list_specific(&(count_arg->cct2metrics_map), n);
-
-  //count the number of non-zero values
   uint64_t num_nzval = hpcrun_metric_sparse_count(data_list);
   (count_arg->num_nzval) += num_nzval;
 
@@ -287,7 +289,10 @@ typedef struct {
   epoch_flags_t flags;
   hpcrun_fmt_cct_node_t* tmp_node;
   cct2metrics_t* cct2metrics_map;
-  sparse_metrics_t* sparse_metrics; //yumeng
+
+  //YUMENG: get metric values while walking through cct
+  sparse_metrics_t* sparse_metrics; 
+
 } write_arg_t;
 
 
@@ -329,7 +334,7 @@ l_dummy(cct_node_t* n, cct_op_arg_t arg, size_t level)
 
 
 #if 0
-//yumeng
+//YUMENG: count non_zero values for each cct, already merged with l_count
 static void
 lcount_nzval(cct_node_t* node, cct_op_arg_t arg, size_t level)
 {
@@ -403,14 +408,9 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
   tmp->lm_ip = (hpcfmt_vma_t) (uintptr_t) (addr->ip_norm).lm_ip;
 
 #if 1
-  // yumeng's code
-  //tmp->num_metrics = my_arg->num_kind_metrics;
+  // YUMENG's code
   metric_data_list_t *data_list = 
     hpcrun_get_metric_data_list_specific(&(my_arg->cct2metrics_map), node);
-
-  //set dense copy
-  //tmp->num_metrics = my_arg->num_kind_metrics;
-  //hpcrun_metric_set_dense_copy(tmp->metrics, data_list, my_arg->num_kind_metrics);
 
   //set_sparse_copy: copy the values into sparse_metrics
   size_t curr_num_cct = sparse_metrics->num_cct;
@@ -809,13 +809,14 @@ hpcrun_cct_insert_path(cct_node_t ** root, cct_node_t* path)
 int
 hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epoch_flags_t flags)
 #else
-/*yumeng*/
+//YUMENG: add sparse_metrics to collect metric values
 int
 hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epoch_flags_t flags, sparse_metrics_t* sparse_metrics)
 #endif
 {
   if (!fs) return HPCRUN_ERR;
 
+  //YUMENG: count number of nodes & number of non-zero values per node
   size_t nodes = 0;
   uint64_t num_nzval = 0;
   if (HPCRUN_CCT_KEEP_DUMMY) {
@@ -824,7 +825,7 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
     nodes = hpcrun_cct_num_nodes(cct, false, &cct2metrics_map,&num_nzval);
   }
 
-  //yumeng: initialize cct_offsets, last offset will be the total number of values
+  //YUMENG: initialize cct_offsets, last offset will be the total number of values
   sparse_metrics->cct_offsets = (uint64_t *) hpcrun_malloc((nodes+1)*sizeof(uint64_t));
   (sparse_metrics->cct_offsets)[0] = 0;
 
@@ -837,7 +838,7 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
   hpcrun_fmt_cct_node_t tmp_node;
 
 #if 0
-//yumeng
+//YUMENG: count the number of non-zero values for each cct, already merged with hpcrun_cct_num_nodes
   uint64_t num_nzval1 = 0;
   sizes_arg_t sizes_arg = {
     // multithreaded code: add personalized cct2metrics_map for multithreading programs
@@ -867,12 +868,12 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
     // this is to allow a thread to write the profile data of another thread.
     .cct2metrics_map = cct2metrics_map,
 
-    /*yumeng pass in and assign value along the way */
+    //YUMENG: collect metric values and info while walking through the cct
     .sparse_metrics = sparse_metrics
   };
 
 
-/*yumeng*/ 
+//YUMENG: no metricTbl info needed to write cct
 #if 0
   hpcrun_metricVal_t metrics[num_kind_metrics];
   tmp_node.metrics = &(metrics[0]);
@@ -884,7 +885,7 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
   hpcrun_cct_walk_node_1st(cct, lwrite, &write_arg);
 
 #if 1
-//yumeng
+//YUMENG
   if(sparse_metrics->num_cct != nodes)printf("\nTEST: number of nodes are not equal if printed. \n");
   if(sparse_metrics->num_vals != (sparse_metrics->cct_offsets)[nodes])printf("\nTEST: number of nzvals are not equal if printed. \n");
 #endif
@@ -901,8 +902,10 @@ hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy, cct2metrics_t **cct2metr
   count_arg_t count_arg = {
     .count_dummy = count_dummy,
     .n = 0,
-    .cct2metrics_map = *cct2metrics_map, //yumeng
-    .num_nzval = *num_nzval //yumeng
+
+    //YUMENG: count number of non-zero values
+    .cct2metrics_map = *cct2metrics_map, 
+    .num_nzval = *num_nzval 
   };
   hpcrun_cct_walk_node_1st(cct, l_count, &count_arg);
   *cct2metrics_map = count_arg.cct2metrics_map;

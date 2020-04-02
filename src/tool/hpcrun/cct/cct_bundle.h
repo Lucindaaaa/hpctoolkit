@@ -98,7 +98,7 @@ extern int hpcrun_cct_bundle_fwrite(FILE* fs, epoch_flags_t flags, cct_bundle_t*
                                     cct2metrics_t* cct2metrics_map);
 
 #else
-/*yumeng*/
+//YUMENG: add sparse_metrics to collect metric values and info
 extern int hpcrun_cct_bundle_fwrite(FILE* fs, epoch_flags_t flags, cct_bundle_t* x,
                          cct2metrics_t* cct2metrics_map, sparse_metrics_t* sparse_metrics);
 #endif

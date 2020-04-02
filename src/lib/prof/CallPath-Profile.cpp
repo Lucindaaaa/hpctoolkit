@@ -1038,7 +1038,7 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   int ret;
   
   // ------------------------------------------------------------
-  // footer -yumeng
+  // footer - YUMENG
   // ------------------------------------------------------------
   size_t footer[7];
   fseek(infs, 0, SEEK_END); 
@@ -1073,14 +1073,14 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   
   prof = NULL;
 
-//yumeng
- // uint num_epochs = 0;
+  //YUMENG: no epoch info needed
+  //uint num_epochs = 0;
   size_t file_cur = 0;
   while ( !feof(infs) && (file_cur != footer[6])) {
 
     Profile* myprof = NULL;
 
-//yumeng    
+//YUMENG: no epoch info needed    
 //    string myCtxtStr = "epoch " + StrUtil::toStr(num_epochs + 1);
 //    ctxtStr += ": " + myCtxtStr;
 
@@ -1102,9 +1102,10 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
     else {
       prof->merge(*myprof, Profile::Merge_MergeMetricById);
     }
-   //yumeng
+   //YUMENG: no epoch info needed
    //num_epochs++;
-   //footer print
+
+   //footer print YUMENG
    file_cur = ftell(infs);
    if((file_cur == footer[6]) && outfs){
      fprintf(outfs,"[footer: \n  ");
@@ -1127,7 +1128,7 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ------------------------------------------------------------
 
   if (outfs) {
-    //yumeng
+    //YUMENG: no epoch info needed
     //fprintf(outfs, "\n[You look fine today! (num-epochs: %u)]\n", num_epochs);
     fprintf(outfs, "\n[You look fine today!]\n");
   }
@@ -1154,7 +1155,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   // Read epoch data
   // ------------------------------------------------------------
 
-/*yumeng*/
+//YUMENG: no epoch info
 #if 0
   // ----------------------------------------
   // epoch-hdr
@@ -1298,7 +1299,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   prof = new Profile(progNm);
 
   prof->m_fmtVersion = hdr.version;
-  //yumeng
+  //YUMENG: no epoch info 
   //prof->m_flags = ehdr.flags;
   //prof->m_measurementGranularity = ehdr.measurementGranularity;
 
@@ -1343,10 +1344,10 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ------------------------------------------------------------
   // cct
   // ------------------------------------------------------------
-/*yumeng*/
 #if 0
   fmt_cct_fread(*prof, infs, rFlags, metricTbl, ctxtStr, outfs);
 #else 
+//YUMENG: no need to parse metricTbl for sparse format
   fmt_cct_fread(*prof, infs, rFlags, ctxtStr, outfs);
 #endif
 
@@ -1357,8 +1358,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   metric_aux_info_t *aux_info;
 
   ret = hpcrun_fmt_metricTbl_fread(&metricTbl, &aux_info, infs, hdr.version, malloc);
-  //if (ret != HPCFMT_OK) {
-  if (ret == HPCFMT_ERR) { //yumeng
+  if (ret != HPCFMT_OK) {
     DIAG_Throw("error reading 'metric-tbl'");
   }
   if (outfs) {
@@ -1508,12 +1508,13 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   }
 
   // ----------------------------------------
-  // yumeng - cct_metrics_sparse_values
+  // cct_metrics_sparse_values - YUMENG
   // ----------------------------------------
   hpcrun_fmt_sparse_metrics_t sparse_metrics;
   hpcrun_fmt_sparse_metrics_fread(&sparse_metrics,infs);
   hpcrun_fmt_sparse_metrics_fprint(&sparse_metrics,outfs,&metricTbl,"  ");
 
+  //YUMENG: no epoch info 
   //hpcrun_fmt_epochHdr_free(&ehdr, free);
   hpcrun_fmt_metricTbl_free(&metricTbl, free);
 
@@ -1526,13 +1527,13 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
 }
 
 
-/*yumeng*/
 #if 0
 int
 Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
 		       const metric_tbl_t& metricTbl,
 		       std::string ctxtStr, FILE* outfs)
 #else
+//YUMENG: no need to parse metricTbl for sparse format
 int
 Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
 		       std::string ctxtStr, FILE* outfs)
@@ -1566,7 +1567,8 @@ Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
     delete cct->root();
     cct->root(NULL);
   }
-/* yumeng */
+
+//YUMENG: No metric info
 #if 0
   // N.B.: numMetricsSrc <= [numMetricsDst = prof.metricMgr()->size()]
   uint numMetricsSrc = metricTbl.len;
@@ -1578,7 +1580,7 @@ Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
 
   hpcrun_fmt_cct_node_t nodeFmt;
 
-/* yumeng */
+//YUMENG: No metric info
 #if 0
   nodeFmt.num_metrics = numMetricsSrc;
   nodeFmt.metrics = (numMetricsSrc > 0) ?
@@ -1599,11 +1601,12 @@ Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
       DIAG_Throw("Error reading CCT node " << nodeFmt.id);
     }
     if (outfs) {
-/*yumeng*/
+
 #if 0
       hpcrun_fmt_cct_node_fprint(&nodeFmt, outfs, prof.m_flags,
 				 &metricTbl, "  ");
 #else
+//YUMENG: No metric info
       hpcrun_fmt_cct_node_fprint(&nodeFmt, outfs, prof.m_flags,
 				  "  ");
 #endif

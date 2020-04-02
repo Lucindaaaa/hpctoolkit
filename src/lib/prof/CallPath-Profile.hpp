@@ -304,13 +304,13 @@ public:
 		  const hpcrun_fmt_hdr_t& hdr,
 		  std::string ctxtStr, const char* filename, FILE* outfs);
 
-/*yumeng*/
 #if 0
   static int
   fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
 		const metric_tbl_t& metricTbl,
 		std::string ctxtStr, FILE* outfs);
 #else
+//YUMENG: No need to parse metricTbl for sparse format
 static int
   fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
 		std::string ctxtStr, FILE* outfs);

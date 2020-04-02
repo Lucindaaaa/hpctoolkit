@@ -126,7 +126,7 @@ static kind_info_t *first_kind = NULL;
 static kind_info_t **next_kind = &first_kind;
 typedef enum { KIND_UNINITIALIZED, KIND_INITIALIZING, KIND_INITIALIZED } kind_state_t;
 static _Atomic(kind_state_t) kind_state = ATOMIC_VAR_INIT(KIND_UNINITIALIZED);
-static int num_kind_metrics; //yumeng：change to num_total_metrics?
+static int num_kind_metrics; //YUMENG：change to num_total_metrics?
 static struct dmap {
   metric_desc_t *desc;
   int id;
@@ -566,10 +566,11 @@ hpcrun_metric_set_dense_copy(cct_metric_data_t* dest,
 }
 
 //
-// yumeng - make a sparse set
+// make a sparse copy - YUMENG 
 //
-#if 0
+
 //used to show what the datalist looks like, test purpose
+#if 0
 void
 datalist_display(metric_data_list_t *data_list)
 {
@@ -619,15 +620,10 @@ hpcrun_metric_sparse_count(metric_data_list_t* list)
       }
     }
   }
- // printf("\n");
   return num_nzval;
 
 }
 
-/*
-void
-hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, metric_position_t* metric_pos,
-			     uint64_t* next_offset,metric_data_list_t* list)*/
 int
 hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, metric_position_t* metric_pos,
 			     metric_data_list_t* list, int initializing_offset)
@@ -641,14 +637,11 @@ hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, metric_position_t* metric_
   int curr_id = 0;//global id of metrics
   int num_nzval = 0;//current number of non-zero values
 
-  //printf("In set-sparse copy:");
-
   for (curr_k = first_kind; curr_k != NULL; curr_k = curr_k->link) {
     for (curr = list; curr != NULL && curr->kind != curr_k; curr = curr->next);
     if(curr){     
       metric_set_t* actual = curr->metrics;
       for(int i = 0; i < curr_k->idx; i++ ){
-        //printf(" %d",actual[i].v1.bits);
         curr_m = actual[i].v1;
         if(curr_m.i != 0){ 
           val[initializing_offset+num_nzval] = curr_m;
@@ -664,8 +657,6 @@ hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, metric_position_t* metric_
       curr_id += curr_k->idx;
     } 
   }
-
- // printf("\n");
 
   //num_nzval will be offset for next cct's metrics
   return num_nzval;

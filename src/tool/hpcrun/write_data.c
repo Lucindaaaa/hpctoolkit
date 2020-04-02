@@ -206,12 +206,12 @@ lazy_open_data_file(core_profile_trace_data_t * cptd)
 static int
 write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch)
 #else
-//yumeng: add footer
+//YUMENG: add footer
 static int
 write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t* footer)
 #endif
 {
-  //yumeng
+  //YUMENG: no epoch info needed
   //uint32_t num_epochs = 0;
 
   if (! hpcrun_sample_prob_active())
@@ -222,7 +222,8 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
   //
 
   epoch_t* current_epoch = epoch;
-/*yumeng*/
+
+//YUMENG: no epoch info needed
 #if 0
   for(epoch_t* s = current_epoch; s; s = s->next) {
     num_epochs++;
@@ -247,7 +248,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
     }
 #endif
 
-/*yumeng: skip epoch info in output file */
+//YUMENG: no epoch info needed
 #if 0
     //
     //  == epoch header ==
@@ -288,7 +289,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
       
       hpcrun_fmt_loadmapEntry_fwrite(&lm_entry, fs);
     }
-    //yumeng
+    //YUMENG: set footer  
     if(footer) footer[3] = ftell(fs);
     
 
@@ -303,7 +304,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
   #if 0
     int ret = hpcrun_cct_bundle_fwrite(fs, epoch_flags, cct, cptd->cct2metrics_map);
   #else
-  /*yumeng*/
+ //YUMENG: set up sparse_metrics and walk through cct
  
   //initialize the sparse_metrics
     sparse_metrics_t sparse_metrics;
@@ -329,7 +330,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
     else {
       TMSG(DATA_WRITE, "saved profile data to hpcrun file ");
     }
-/*yumeng supposed to be 1*/
+
 #if 1
     //
     // == metrics ==
@@ -345,7 +346,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
       metric_tbl = hpcrun_get_metric_tbl(&curr);
     }
 
-    //yumeng
+    //YUMENG: set footer
     if(footer) footer[5] = ftell(fs);
 
 
@@ -354,7 +355,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
     current_loadmap++;
 
     //
-    // == cct_metrics_sparse_values == yumeng
+    // ==  hpcrun_fmt_sparse_metrics == YUMENG
     //
     hpcrun_fmt_sparse_metrics_t hpcrun_sparse_metrics;
     hpcrun_sparse_metrics.tid = sparse_metrics.tid;
@@ -375,7 +376,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
     if(footer) footer[6] = ftell(fs);
 
     //
-    // == footer == yumeng
+    // == footer == YUMENG
     //
     if(s->next == NULL){
       for(int i = 0; i<7; i++){
@@ -404,12 +405,16 @@ hpcrun_write_profile_data(core_profile_trace_data_t * cptd)
 {
   if(cptd->scale_fn) cptd->scale_fn((void*)cptd);
 
+  //YUMENG: set up footer
   size_t footer[7];
   footer[0] = 0;
 
   TMSG(DATA_WRITE,"Writing hpcrun profile data");
   FILE* fs = lazy_open_data_file(cptd);
+
+  //YUMENG: set footer
   footer[1] = ftell(fs);
+  
   if (fs == NULL)
     return HPCRUN_ERR;
 

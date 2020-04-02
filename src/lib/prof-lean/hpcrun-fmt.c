@@ -523,14 +523,20 @@ hpcrun_fmt_metric_set_value_real( hpcrun_metricFlags_t *flags,
 int
 hpcrun_fmt_loadmap_fread(loadmap_t* loadmap, FILE* fs, hpcfmt_alloc_fn alloc)
 {
+
 #if 1
-/*yumeng*/
-  if(hpcfmt_int4_fread(&(loadmap->len), fs) == HPCFMT_EOF ){
+//YUMENG: no epoch, so loadmap needs to handle EOF situation
+  int r = hpcfmt_int4_fread(&(loadmap->len), fs);
+  if(r == HPCFMT_EOF ){
     return HPCFMT_EOF;
+  }
+  if(r != HPCFMT_OK){
+    return HPCFMT_ERR;
   }
 #else
   HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(loadmap->len), fs));
 #endif
+
   if (alloc) {
     loadmap->lst = alloc(loadmap->len * sizeof(loadmap_entry_t));
   }
@@ -649,7 +655,7 @@ hpcrun_fmt_cct_node_fread(hpcrun_fmt_cct_node_t* x,
   if (flags.fields.isLogicalUnwind) {
     hpcrun_fmt_lip_fread(&x->lip, fs);
   }
-/*yumeng*/
+//YUMENG: no need for sparse format
 #if 0
   for (int i = 0; i < x->num_metrics; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->metrics[i].bits, fs));
@@ -676,7 +682,7 @@ hpcrun_fmt_cct_node_fwrite(hpcrun_fmt_cct_node_t* x,
   if (flags.fields.isLogicalUnwind) {
     HPCFMT_ThrowIfError(hpcrun_fmt_lip_fwrite(&x->lip, fs));
   }
-/*yumeng*/
+//YUMENG: no need for sparse format
 #if 0
   for (int i = 0; i < x->num_metrics; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->metrics[i].bits, fs));
@@ -686,13 +692,14 @@ hpcrun_fmt_cct_node_fwrite(hpcrun_fmt_cct_node_t* x,
   return HPCFMT_OK;
 }
 
-/*yumeng*/
+
 #if 0
 int
 hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 			   epoch_flags_t flags, const metric_tbl_t* metricTbl,
 			   const char* pre)
 #else
+//YUMENG: no need to parse metricTbl for sparse format
 int
 hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 			   epoch_flags_t flags, const char* pre)
@@ -716,7 +723,7 @@ hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
     hpcrun_fmt_lip_fprint(&x->lip, fs, "");
   }
 
-/*yumeng*/
+//YUMENG: no need for sparse format
 #if 0
   fprintf(fs, "\n");
 
@@ -752,7 +759,7 @@ hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 
 
 //***************************************************************************
-// sparse metircs - yumeng
+// sparse metircs - YUMENG
 //***************************************************************************
 
  int

@@ -109,7 +109,7 @@ int
 hpcrun_cct_bundle_fwrite(FILE* fs, epoch_flags_t flags, cct_bundle_t* bndl,
                          cct2metrics_t* cct2metrics_map)           
 #else
-/*yumeng*/
+//YUMENG: add sparse_metrics to collect metric values and info
 int 
 hpcrun_cct_bundle_fwrite(FILE* fs, epoch_flags_t flags, cct_bundle_t* bndl,
                          cct2metrics_t* cct2metrics_map, sparse_metrics_t* sparse_metrics)
@@ -135,7 +135,8 @@ hpcrun_cct_bundle_fwrite(FILE* fs, epoch_flags_t flags, cct_bundle_t* bndl,
   // write out newly constructed cct
 #if 0
   return hpcrun_cct_fwrite(cct2metrics_map, bndl->top, fs, flags);
-#else /*yumeng*/
+#else 
+//YUMENG: add sparse_metrics to collect metric values and info
   return hpcrun_cct_fwrite(cct2metrics_map, bndl->top, fs, flags, sparse_metrics);
 #endif
 }

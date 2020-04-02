@@ -120,8 +120,7 @@ typedef struct cct_node_t cct_node_t;
 
 typedef cct_node_t* cct_node_id_t;
 
-#if 1
-/*yumeng*/
+//YUMENG
 struct sparse_metrics_t{
   int tid;
   uint64_t num_vals;
@@ -132,8 +131,6 @@ struct sparse_metrics_t{
 };
 
 typedef struct sparse_metrics_t sparse_metrics_t;
-
-#endif
 
 //
 // Interface procedures
@@ -283,11 +280,12 @@ extern void hpcrun_cct_walkset(cct_node_t* cct, cct_op_t fn, cct_op_arg_t arg);
 // TODO: need to declare cct2metrics_t here to avoid to cyclic inclusion
 typedef struct cct2metrics_t cct2metrics_t;
 
-/*yumeng*/
+
 #if 0
 int hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map,
                       cct_node_t* cct, FILE* fs, epoch_flags_t flags);
 #else 
+//YUMENG: add sparse_metrics to collect metric values and info 
 int hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map,
                       cct_node_t* cct, FILE* fs, epoch_flags_t flags,sparse_metrics_t* sparse_metrics);
 #endif

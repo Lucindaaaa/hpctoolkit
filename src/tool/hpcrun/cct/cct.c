@@ -391,10 +391,12 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
   tmp->id = hpcrun_cct_persistent_id(node);
   tmp->id_parent = parent ? hpcrun_cct_persistent_id(parent) : 0;
 
+  //YUMENG: seems no need to inform new prof about being leaf
   // if no children, chg sign of id when written out
-  if (hpcrun_cct_no_children(node) || all_children_dummy) {
-    tmp->id = -tmp->id;
-  }
+  //if (hpcrun_cct_no_children(node) || all_children_dummy) {
+  //  tmp->id = -tmp->id;
+  //}
+
   if (flags.fields.isLogicalUnwind){
     tmp->as_info = addr->as_info;
     lush_lip_init(&tmp->lip);

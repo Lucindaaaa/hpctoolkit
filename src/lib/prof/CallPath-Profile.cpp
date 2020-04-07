@@ -1000,6 +1000,7 @@ Profile::make(const char* fnm, uint rFlags, FILE* outfs)
   int ret;
 
   FILE* fs = hpcio_fopen_r(fnm);
+
   if (!fs) {
     if (errno == ENOENT)
       fprintf(stderr, "ERROR: measurement file or directory '%s' does not exist\n",
@@ -1020,6 +1021,7 @@ Profile::make(const char* fnm, uint rFlags, FILE* outfs)
   rFlags |= RFlg_HpcrunData; // TODO: for now assume an hpcrun file (verify!)
 
   Profile* prof = NULL;
+  
   ret = fmt_fread(prof, fs, rFlags, fnm, fnm, outfs);
   
   hpcio_fclose(fs);
@@ -1035,6 +1037,18 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
 		   std::string ctxtStr, const char* filename, FILE* outfs)
 {
   int ret;
+  
+  // ------------------------------------------------------------
+  // footer - YUMENG
+  // ------------------------------------------------------------
+  size_t footer[7];
+  fseek(infs, 0, SEEK_END); 
+  size_t footer_position = ftell(infs) - 56;
+  fseek(infs, footer_position, SEEK_SET); 
+  for(int i = 0; i<7; i++){
+    hpcfmt_int8_fread(&(footer[i]), infs);
+  }
+  fseek(infs, footer[0], SEEK_SET); 
 
   // ------------------------------------------------------------
   // hdr
@@ -1054,20 +1068,22 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
     hpcrun_fmt_hdr_fprint(&hdr, outfs);
   }
 
-
   // ------------------------------------------------------------
   // epoch: Read each epoch and merge them to form one Profile
   // ------------------------------------------------------------
   
   prof = NULL;
 
-  uint num_epochs = 0;
-  while ( !feof(infs) ) {
+  //YUMENG: no epoch info needed
+  //uint num_epochs = 0;
+  size_t file_cur = 0;
+  while ( !feof(infs) && (file_cur != footer[6])) {
 
     Profile* myprof = NULL;
-    
-    string myCtxtStr = "epoch " + StrUtil::toStr(num_epochs + 1);
-    ctxtStr += ": " + myCtxtStr;
+
+//YUMENG: no epoch info needed    
+//    string myCtxtStr = "epoch " + StrUtil::toStr(num_epochs + 1);
+//    ctxtStr += ": " + myCtxtStr;
 
     try {
       ret = fmt_epoch_fread(myprof, infs, rFlags, hdr,
@@ -1087,8 +1103,18 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
     else {
       prof->merge(*myprof, Profile::Merge_MergeMetricById);
     }
+   //YUMENG: no epoch info needed
+   //num_epochs++;
 
-    num_epochs++;
+   //footer print YUMENG
+   file_cur = ftell(infs);
+   if((file_cur == footer[6]) && outfs){
+     fprintf(outfs,"[footer: \n  ");
+     for(int i = 0; i<7;i++){
+       fprintf(outfs,"%d ",footer[i]);
+     }
+     fprintf(outfs,"\n]\n");
+   }
   }
 
   if (!prof) {
@@ -1103,7 +1129,9 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ------------------------------------------------------------
 
   if (outfs) {
-    fprintf(outfs, "\n[You look fine today! (num-epochs: %u)]\n", num_epochs);
+    //YUMENG: no epoch info needed
+    //fprintf(outfs, "\n[You look fine today! (num-epochs: %u)]\n", num_epochs);
+    fprintf(outfs, "\n[You look fine today!]\n");
   }
 
   hpcrun_fmt_hdr_free(&hdr, free);
@@ -1128,6 +1156,8 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   // Read epoch data
   // ------------------------------------------------------------
 
+//YUMENG: no epoch info
+#if 0
   // ----------------------------------------
   // epoch-hdr
   // ----------------------------------------
@@ -1142,34 +1172,23 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   if (outfs) {
     hpcrun_fmt_epochHdr_fprint(&ehdr, outfs);
   }
-
-  // ----------------------------------------
-  // metric-tbl
-  // ----------------------------------------
-  metric_tbl_t metricTbl;
-  metric_aux_info_t *aux_info;
-
-  ret = hpcrun_fmt_metricTbl_fread(&metricTbl, &aux_info, infs, hdr.version, malloc);
-  if (ret != HPCFMT_OK) {
-    DIAG_Throw("error reading 'metric-tbl'");
-  }
-  if (outfs) {
-    hpcrun_fmt_metricTbl_fprint(&metricTbl, aux_info, outfs);
-  }
-
-  const uint numMetricsSrc = metricTbl.len;
-  
+#endif
   // ----------------------------------------
   // loadmap
   // ----------------------------------------
   loadmap_t loadmap_tbl;
   ret = hpcrun_fmt_loadmap_fread(&loadmap_tbl, infs, malloc);
+
+  if (ret == HPCFMT_EOF) {
+    return HPCFMT_EOF;
+  }
   if (ret != HPCFMT_OK) {
     DIAG_Throw("error reading 'loadmap'");
   }
   if (outfs) {
     hpcrun_fmt_loadmap_fprint(&loadmap_tbl, outfs);
   }
+  
 
   // ------------------------------------------------------------
   // Create Profile
@@ -1264,14 +1283,15 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
 
   // N.B.: We currently assume FmtEpoch_NV_virtualMetrics is set iff
   // we read from a memory buffer.  Possibly we need an explicit tag for this.
-
   bool isVirtualMetrics = false;
+/* yumemg, needs to figure out the usage of this portion, cut right now due to missing of epoch */
+#if 0
   val = hpcfmt_nvpairList_search(&(ehdr.nvps), FmtEpoch_NV_virtualMetrics);
   if (val && strcmp(val, "0") != 0) {
     isVirtualMetrics = true;
     rFlags |= RFlg_NoMetricValues;
   }
-
+#endif
 
   // ----------------------------------------
   // make CallPath::Profile
@@ -1280,8 +1300,9 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   prof = new Profile(progNm);
 
   prof->m_fmtVersion = hdr.version;
-  prof->m_flags = ehdr.flags;
-  prof->m_measurementGranularity = ehdr.measurementGranularity;
+  //YUMENG: no epoch info 
+  //prof->m_flags = ehdr.flags;
+  //prof->m_measurementGranularity = ehdr.measurementGranularity;
 
   prof->m_profileFileName = profFileName;
 
@@ -1293,6 +1314,59 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
     prof->m_traceMinTime = traceMinTime;
     prof->m_traceMaxTime = traceMaxTime;
   }
+
+  // ----------------------------------------
+  // make loadmap
+  // ----------------------------------------
+
+  uint num_lm = loadmap_tbl.len;
+
+  LoadMap loadmap(num_lm);
+
+  for (uint i = 0; i < num_lm; ++i) {
+    string nm = loadmap_tbl.lst[i].name;
+    RealPathMgr::singleton().realpath(nm);
+
+    LoadMap::LM* lm = new LoadMap::LM(nm);
+    loadmap.lm_insert(lm);
+    
+    DIAG_Assert(lm->id() == i + 1, "Profile::fmt_epoch_fread: Currently expect load module id's to be in dense ascending order.");
+  }
+
+  DIAG_MsgIf(DBG, loadmap.toString());
+
+  std::vector<LoadMap::MergeEffect>* mrgEffect =
+    prof->loadmap()->merge(loadmap);
+  DIAG_Assert(mrgEffect->empty(), "Profile::fmt_epoch_fread: " << DIAG_UnexpectedInput);
+
+  hpcrun_fmt_loadmap_free(&loadmap_tbl, free);
+  delete mrgEffect;
+
+  // ------------------------------------------------------------
+  // cct
+  // ------------------------------------------------------------
+#if 0
+  fmt_cct_fread(*prof, infs, rFlags, metricTbl, ctxtStr, outfs);
+#else 
+//YUMENG: no need to parse metricTbl for sparse format
+  fmt_cct_fread(*prof, infs, rFlags, ctxtStr, outfs);
+#endif
+
+  // ----------------------------------------
+  // metric-tbl
+  // ----------------------------------------
+  metric_tbl_t metricTbl;
+  metric_aux_info_t *aux_info;
+
+  ret = hpcrun_fmt_metricTbl_fread(&metricTbl, &aux_info, infs, hdr.version, malloc);
+  if (ret != HPCFMT_OK) {
+    DIAG_Throw("error reading 'metric-tbl'");
+  }
+  if (outfs) {
+    hpcrun_fmt_metricTbl_fprint(&metricTbl, aux_info, outfs);
+  }
+
+  const uint numMetricsSrc = metricTbl.len;
 
 
   // ----------------------------------------
@@ -1314,6 +1388,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
     m_sfx = "";
     //if (!tidStr.empty()) { m_sfx = "[" + tidStr + "]"; } // TODO:threads
   }
+
 
   metric_desc_t* m_lst = metricTbl.lst;
   for (uint i = 0; i < numMetricsSrc; i++) {
@@ -1434,55 +1509,38 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   }
 
   // ----------------------------------------
-  // make loadmap
+  // cct_metrics_sparse_values - YUMENG
   // ----------------------------------------
+  hpcrun_fmt_sparse_metrics_t sparse_metrics;
+  hpcrun_fmt_sparse_metrics_fread(&sparse_metrics,infs);
+  hpcrun_fmt_sparse_metrics_fprint(&sparse_metrics,outfs,&metricTbl,"  ");
 
-  uint num_lm = loadmap_tbl.len;
-
-  LoadMap loadmap(num_lm);
-
-  for (uint i = 0; i < num_lm; ++i) {
-    string nm = loadmap_tbl.lst[i].name;
-    RealPathMgr::singleton().realpath(nm);
-
-    LoadMap::LM* lm = new LoadMap::LM(nm);
-    loadmap.lm_insert(lm);
-    
-    DIAG_Assert(lm->id() == i + 1, "Profile::fmt_epoch_fread: Currently expect load module id's to be in dense ascending order.");
-  }
-
-  DIAG_MsgIf(DBG, loadmap.toString());
-
-  std::vector<LoadMap::MergeEffect>* mrgEffect =
-    prof->loadmap()->merge(loadmap);
-  DIAG_Assert(mrgEffect->empty(), "Profile::fmt_epoch_fread: " << DIAG_UnexpectedInput);
-
-  hpcrun_fmt_loadmap_free(&loadmap_tbl, free);
-  delete mrgEffect;
-
-
-  // ------------------------------------------------------------
-  // cct
-  // ------------------------------------------------------------
-  fmt_cct_fread(*prof, infs, rFlags, metricTbl, ctxtStr, outfs);
-
-
-  hpcrun_fmt_epochHdr_free(&ehdr, free);
+  //YUMENG: no epoch info 
+  //hpcrun_fmt_epochHdr_free(&ehdr, free);
   hpcrun_fmt_metricTbl_free(&metricTbl, free);
 
   if (aux_info) {
     free(aux_info);
   }
-  
+
+
   return HPCFMT_OK;
 }
 
 
+#if 0
 int
 Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
 		       const metric_tbl_t& metricTbl,
 		       std::string ctxtStr, FILE* outfs)
+#else
+//YUMENG: no need to parse metricTbl for sparse format
+int
+Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
+		       std::string ctxtStr, FILE* outfs)
+#endif
 {
+ 
   typedef std::map<int, CCT::ANode*> CCTIdToCCTNodeMap;
 
   DIAG_Assert(infs, "Bad file descriptor!");
@@ -1500,7 +1558,6 @@ Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
   // ------------------------------------------------------------
   // Read each CCT node
   // ------------------------------------------------------------
-
   if (outfs) {
     fprintf(outfs, "[cct: (num-nodes: %" PRIu64 ")\n", numNodes);
   }
@@ -1512,18 +1569,25 @@ Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
     cct->root(NULL);
   }
 
+//YUMENG: No metric info
+#if 0
   // N.B.: numMetricsSrc <= [numMetricsDst = prof.metricMgr()->size()]
   uint numMetricsSrc = metricTbl.len;
 
   if (rFlags & RFlg_NoMetricValues) {
     numMetricsSrc = 0;
   }
+#endif
 
   hpcrun_fmt_cct_node_t nodeFmt;
+
+//YUMENG: No metric info
+#if 0
   nodeFmt.num_metrics = numMetricsSrc;
   nodeFmt.metrics = (numMetricsSrc > 0) ?
     (hpcrun_metricVal_t*)alloca(numMetricsSrc * sizeof(hpcrun_metricVal_t))
     : NULL;
+#endif
 
 #if 0
   ExprEval eval;
@@ -1538,9 +1602,17 @@ Profile::fmt_cct_fread(Profile& prof, FILE* infs, uint rFlags,
       DIAG_Throw("Error reading CCT node " << nodeFmt.id);
     }
     if (outfs) {
+
+#if 0
       hpcrun_fmt_cct_node_fprint(&nodeFmt, outfs, prof.m_flags,
 				 &metricTbl, "  ");
+#else
+//YUMENG: No metric info
+      hpcrun_fmt_cct_node_fprint(&nodeFmt, outfs, prof.m_flags,
+				  "  ");
+#endif
     }
+
 #if 0
     // ------------------------------------------
     // check if the metric contains a formula

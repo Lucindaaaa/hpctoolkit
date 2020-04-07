@@ -100,7 +100,7 @@ AC_MSG_NOTICE([INFO: from user: MPIF77='${MPIF77}'])
 
 # NOTE: please update config/README.version
 AC_PREREQ(2.69)
-AM_INIT_AUTOMAKE(1.15.1)
+AM_INIT_AUTOMAKE([1.15.1 subdir-objects])
 LT_PREREQ([2.4.6])
 
 AM_MAINTAINER_MODE()
@@ -782,12 +782,12 @@ case "${host}" in
 esac
 
 # Grab optimization flags
-HOST_CFLAGS="${HOST_CFLAGS} ${my_opt_cflags}"
-HOST_CXXFLAGS="${HOST_CXXFLAGS} ${my_opt_cxxflags}"
+HOST_CFLAGS="${HOST_CFLAGS} ${my_opt_cflags} -flto"
+HOST_CXXFLAGS="${HOST_CXXFLAGS} ${my_opt_cxxflags} -flto"
 
 # Several programs need system's demangle option
 HOST_HPCSTRUCT_LDFLAGS="${HOST_HPCSTRUCT_LDFLAGS} ${my_demangle_ldflags}"
-HOST_HPCPROF_LDFLAGS="${HOST_HPCPROF_LDFLAGS} ${my_demangle_ldflags}"
+HOST_HPCPROF_LDFLAGS="${HOST_HPCPROF_LDFLAGS} ${my_demangle_ldflags} -flto"
 HOST_XPROF_LDFLAGS="${HOST_XPROF_LDFLAGS} ${my_demangle_ldflags}"
 
 
@@ -1593,6 +1593,34 @@ AM_CONDITIONAL(OPT_ENABLE_MPI, [test "$prof_mpi_avail" = yes])
 
 
 #-------------------------------------------------
+# Test if linux/futex.h is available
+# TODO: Make this a better test, and/or an --enable option
+#-------------------------------------------------
+
+AC_MSG_CHECKING([if futexes are available])
+
+AC_LANG_PUSH([C])
+
+AC_COMPILE_IFELSE([
+AC_LANG_SOURCE([[
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <linux/futex.h>
+int test() {
+  return syscall(SYS_futex, NULL, FUTEX_WAIT_PRIVATE, 42, NULL, NULL, 0);
+}
+]])], [futexes_enabled=yes], [futexes_enabled=no])
+
+AC_MSG_RESULT([$futexes_enabled])
+
+AC_LANG_POP
+
+if test "$futexes_enabled" = yes; then
+  AC_DEFINE(HAVE_FUTEX_H, [1], [Whether futexes are available for use.])
+fi
+
+#-------------------------------------------------
 # Distribute these settings into makefiles
 #-------------------------------------------------
 
@@ -2183,7 +2211,7 @@ BOOST_COPY=no
 # missing library, so it doesn't have to be exact.
 
 BOOST_COPY_LIST='atomic chrono date_time filesystem graph regex system thread timer'
-BOOST_NEEDED_LIST='graph regex system'
+BOOST_NEEDED_LIST='filesystem graph regex system'
 
 AC_MSG_CHECKING([for boost])
 
@@ -4874,6 +4902,8 @@ AC_CONFIG_FILES([ \
   src/tool/hpclump/Makefile \
   src/tool/hpcprof/Makefile \
   src/tool/hpcprof-mpi/Makefile \
+  src/tool/hpcprof2/Makefile \
+  src/tool/hpcprof2-mpi/Makefile \
   src/tool/hpcprof-flat/Makefile \
   src/tool/hpcproftt/Makefile \
   src/tool/hpcrun/Makefile \
@@ -4891,6 +4921,7 @@ AC_CONFIG_FILES([ \
   src/lib/binutils/Makefile \
   src/lib/isa/Makefile \
   src/lib/prof/Makefile \
+  src/lib/profile/Makefile \
   src/lib/profxml/Makefile \
   src/lib/prof-lean/Makefile \
   src/lib/stubs-gcc_s/Makefile \

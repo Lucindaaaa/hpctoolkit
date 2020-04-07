@@ -103,6 +103,31 @@ static const char HPCPROF_MetricDBSfx[] = "metric-db";
 
 static const char HPCPROF_TmpFnmSfx[] = "tmp";
 
+//***************************************************************************
+//YUMENG
+typedef struct hpcrun_sparse_file {
+  FILE* file;
+  size_t footer[7];
+
+  //use for Pause, Resume
+  bool mode;
+  size_t cur_pos;
+
+  //keep track for next_xx functions
+  uint32_t cur_cct;
+  size_t cur_metric;
+  uint16_t cur_metric_id; //count the id, metric desc doesn't have it
+  size_t cur_lm;
+  uint32_t cur_block;
+
+  //to read metric values for current block, initialized when hpcrun_sparse_next_block is called
+  size_t cur_block_end;
+  uint64_t num_nzval;
+  size_t metric_pos_offset;
+  size_t cct_offset_offset;
+  size_t val_offset;
+
+} hpcrun_sparse_file_t;
 
 //***************************************************************************
 // hdr
@@ -111,7 +136,7 @@ static const char HPCPROF_TmpFnmSfx[] = "tmp";
 // N.B.: The header string is 24 bytes of character data
 
 static const char HPCRUN_FMT_Magic[]   = "HPCRUN-profile____"; // 18 bytes
-static const char HPCRUN_FMT_Version[] = "03.00";              // 5 bytes
+static const char HPCRUN_FMT_Version[] = "04.00";              // 5 bytes
 static const char HPCRUN_FMT_Endian[]  = "b";                  // 1 byte
 
 static const int HPCRUN_FMT_MagicLen   = (sizeof(HPCRUN_FMT_Magic) - 1);
@@ -375,7 +400,7 @@ typedef struct metric_desc_t {
   hpcrun_metricFlags_t flags;
 
   uint64_t period;
-  
+
   metric_desc_properties_t properties;
 
   char* formula;
@@ -393,6 +418,7 @@ typedef HPCFMT_List(metric_desc_t) metric_tbl_t; // hpcrun_metricTbl_t
 typedef metric_desc_t* metric_desc_p_t;
 HPCFMT_List_declare(metric_desc_p_t);
 typedef HPCFMT_List(metric_desc_p_t) metric_desc_p_tbl_t; // HPCFMT_List of metric_desc_t*
+
 
 extern int
 hpcrun_fmt_metricTbl_fread(metric_tbl_t* metric_tbl, metric_aux_info_t **aux_info, FILE* in,
@@ -425,11 +451,11 @@ hpcrun_fmt_metricDesc_free(metric_desc_t* x, hpcfmt_free_fn dealloc);
 // metric get and set
 // ---------------------------------------------------------
 
-double 
+double
 hpcrun_fmt_metric_get_value(metric_desc_t metric_desc, hpcrun_metricVal_t metric);
 
 void
-hpcrun_fmt_metric_set_value(metric_desc_t metric_desc, 
+hpcrun_fmt_metric_set_value(metric_desc_t metric_desc,
    hpcrun_metricVal_t *metric, double value);
 
 void
@@ -456,10 +482,8 @@ typedef struct loadmap_entry_t {
 
 } loadmap_entry_t;
 
-
 HPCFMT_List_declare(loadmap_entry_t);
 typedef HPCFMT_List(loadmap_entry_t) loadmap_t; // hpcrun_loadmap_t
-
 
 extern int
 hpcrun_fmt_loadmap_fread(loadmap_t* loadmap, FILE* infs, hpcfmt_alloc_fn alloc);
@@ -559,14 +583,71 @@ extern int
 hpcrun_fmt_cct_node_fwrite(hpcrun_fmt_cct_node_t* x,
 			   epoch_flags_t flags, FILE* fs);
 
+#if 0
 extern int
 hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 			   epoch_flags_t flags, const metric_tbl_t* metricTbl,
 			   const char* pre);
+#else
+//YUMENG: no need to parse metricTbl for sparse format
+extern int
+hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
+			   epoch_flags_t flags,const char* pre);
+#endif
+
+//***************************************************************************
+// sparse metrics - YUMENG
+//***************************************************************************
+
+// --------------------------------------------------------------------------
+// hpcrun_fmt_sparse_metrics_t
+// --------------------------------------------------------------------------
+struct hpcrun_fmt_sparse_metrics_t{
+  int tid;
+  uint64_t num_vals;
+  uint64_t num_cct;
+  hpcrun_metricVal_t* values;
+  uint16_t* mid;
+  uint64_t* m_offset;
+  //metric_position_t* metric_pos;
+  uint64_t *cct_offsets;
+};
+
+typedef struct hpcrun_fmt_sparse_metrics_t hpcrun_fmt_sparse_metrics_t;
+
+extern int
+hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+
+extern int
+hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+
+extern int
+hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
+			   const metric_tbl_t* metricTbl, const char* pre);
+
 
 
 // --------------------------------------------------------------------------
-// 
+// hpcrun_sparse_file
+// --------------------------------------------------------------------------
+#define OPENED 0
+#define PAUSED 1
+
+hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path);
+int hpcrun_sparse_pause(hpcrun_sparse_file_t* sparse_fs);
+int hpcrun_sparse_resume(hpcrun_sparse_file_t* sparse_fs, const char* path);
+void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs);
+
+int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hdr);
+int hpcrun_sparse_next_lm(hpcrun_sparse_file_t* sparse_fs, loadmap_entry_t* lm);
+int hpcrun_sparse_next_metric(hpcrun_sparse_file_t* sparse_fs, metric_desc_t* m, metric_aux_info_t* perf_info,double fmtVersion);
+int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_node_t* node);
+int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs);
+int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t* val);
+
+
+// --------------------------------------------------------------------------
+//
 // --------------------------------------------------------------------------
 
 extern int
@@ -595,7 +676,7 @@ static const char HPCTRACE_FMT_Magic[]   = "HPCRUN-trace______"; // 18 bytes
 static const char HPCTRACE_FMT_Version[] = "01.01";              // 5 bytes
 static const char HPCTRACE_FMT_Endian[]  = "b";                  // 1 byte
 
-// Use of bit fields is not recommended as the order of fields 
+// Use of bit fields is not recommended as the order of fields
 // is compiler and architecture dependent.
 /*
 typedef struct hpctrace_hdr_flags_bitfield {
@@ -669,16 +750,16 @@ hpctrace_fmt_hdr_fprint(hpctrace_fmt_hdr_t* hdr, FILE* fs);
 // Time and dLCA is stored in one 64-bit integer (not true at present)
 
 // Time in nanoseconds is stored in lower HPCTRACE_FMT_TIME_BITS bits.
-#define HPCTRACE_FMT_TIME_BITS 64 
+#define HPCTRACE_FMT_TIME_BITS 64
 #if 0
-#define HPCTRACE_FMT_TIME_MAX ((~(0ULL)) >> (64 - HPCTRACE_FMT_TIME_BITS)) 
+#define HPCTRACE_FMT_TIME_MAX ((~(0ULL)) >> (64 - HPCTRACE_FMT_TIME_BITS))
 #define HPCTRACE_FMT_GET_TIME(bits) \
   (bits & HPCTRACE_FMT_TIME_MAX)
 #define HPCTRACE_FMT_SET_TIME(bits, time) \
   bits = (bits & (~HPCTRACE_FMT_TIME_MAX)) | (time & HPCTRACE_FMT_TIME_MAX)
-// dLCA = distance of previous sample's leaf call frame to 
+// dLCA = distance of previous sample's leaf call frame to
 // the Least Common Ancestor (LCA) with this sample in the CCT.
-// dLCA is only valid when trampoline is used. 
+// dLCA is only valid when trampoline is used.
 // dLCA is stored in higher HPCTRACE_FMT_DLCA_BITS bits, supporting up to 1023.
 #define HPCTRACE_FMT_DLCA_BITS 10 // Use 10 bits to store dLCA.
 #define HPCTRACE_FMT_DLCA_NULL ((1ULL << HPCTRACE_FMT_DLCA_BITS) - 1) // 10 bits of 1s

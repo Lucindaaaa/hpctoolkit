@@ -45,7 +45,6 @@
 # C Preprocessor
 ############################################################
 
-
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -104,6 +103,8 @@ am__make_dryrun = (target_option=n; $(am__make_running_with_option))
 am__make_keepgoing = (target_option=k; $(am__make_running_with_option))
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
+pkglibdir = $(libdir)/@PACKAGE@
+pkglibexecdir = $(libexecdir)/@PACKAGE@
 am__cd = CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
 install_sh_DATA = $(install_sh) -c -m 644
 install_sh_PROGRAM = $(install_sh) -c
@@ -118,8 +119,10 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-pkglibexec_PROGRAMS = hpcproftt-bin$(EXEEXT)
-subdir = src/tool/hpcproftt
+@OPT_ENABLE_OPENMP_TRUE@am__append_1 = $(OPENMP_FLAG)
+@OPT_ENABLE_OPENMP_TRUE@am__append_2 = $(OPENMP_FLAG)
+bin_PROGRAMS = hpcprof2$(EXEEXT)
+subdir = src/tool/hpcprof2
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/ltoptions.m4 \
@@ -133,59 +136,24 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(SHELL) $(top_srcdir)/config/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/src/include/hpctoolkit-config.h
-CONFIG_CLEAN_FILES = hpcproftt
+CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(pkglibexecdir)" \
-	"$(DESTDIR)$(pkglibexecdir)"
-PROGRAMS = $(pkglibexec_PROGRAMS)
-am__objects_1 = hpcproftt_bin-main.$(OBJEXT) \
-	hpcproftt_bin-Args.$(OBJEXT)
-am_hpcproftt_bin_OBJECTS = $(am__objects_1)
-hpcproftt_bin_OBJECTS = $(am_hpcproftt_bin_OBJECTS)
+am__installdirs = "$(DESTDIR)$(bindir)"
+PROGRAMS = $(bin_PROGRAMS)
+am__objects_1 = hpcprof2-main.$(OBJEXT) hpcprof2-args.$(OBJEXT)
+am_hpcprof2_OBJECTS = $(am__objects_1)
+hpcprof2_OBJECTS = $(am_hpcprof2_OBJECTS)
 am__DEPENDENCIES_1 =
-@HOST_CPU_X86_FAMILY_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
-am__DEPENDENCIES_3 = $(HPCLIB_Analysis) $(HPCLIB_Banal_Simple) \
-	$(HPCLIB_ProfXML) $(HPCLIB_Prof) $(HPCLIB_Binutils) \
-	$(HPCLIB_ProfLean) $(HPCLIB_ISA) $(am__DEPENDENCIES_2) \
-	$(HPCLIB_XML) $(HPCLIB_Support) $(HPCLIB_SupportLean) \
-	$(am__DEPENDENCIES_1)
-hpcproftt_bin_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am__DEPENDENCIES_2 = $(HPCLIB_Profile) $(HPCLIB_ProfLean) \
+	$(HPCLIB_SupportLean) $(am__DEPENDENCIES_1)
+hpcprof2_DEPENDENCIES = $(am__DEPENDENCIES_2)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
-hpcproftt_bin_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
-	$(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) $(hpcproftt_bin_LDFLAGS) \
-	$(LDFLAGS) -o $@
-am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
-am__vpath_adj = case $$p in \
-    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
-    *) f=$$p;; \
-  esac;
-am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
-am__install_max = 40
-am__nobase_strip_setup = \
-  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
-am__nobase_strip = \
-  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
-am__nobase_list = $(am__nobase_strip_setup); \
-  for p in $$list; do echo "$$p $$p"; done | \
-  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
-  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
-    if (++n[$$2] == $(am__install_max)) \
-      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
-    END { for (dir in files) print dir, files[dir] }'
-am__base_list = \
-  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
-  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
-am__uninstall_files_from_dir = { \
-  test -z "$$files" \
-    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
-    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
-         $(am__cd) "$$dir" && rm -f $$files; }; \
-  }
-SCRIPTS = $(pkglibexec_SCRIPTS)
+hpcprof2_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(hpcprof2_CXXFLAGS) \
+	$(CXXFLAGS) $(hpcprof2_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -220,26 +188,8 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
-LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
-	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
-	$(AM_CFLAGS) $(CFLAGS)
-AM_V_CC = $(am__v_CC_@AM_V@)
-am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
-am__v_CC_0 = @echo "  CC      " $@;
-am__v_CC_1 = 
-CCLD = $(CC)
-LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-AM_V_CCLD = $(am__v_CCLD_@AM_V@)
-am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
-am__v_CCLD_0 = @echo "  CCLD    " $@;
-am__v_CCLD_1 = 
-SOURCES = $(hpcproftt_bin_SOURCES)
-DIST_SOURCES = $(hpcproftt_bin_SOURCES)
+SOURCES = $(hpcprof2_SOURCES)
+DIST_SOURCES = $(hpcprof2_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -264,18 +214,11 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 ETAGS = etags
 CTAGS = ctags
-am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/hpcproftt.in \
-	$(top_srcdir)/config/depcomp \
+am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/config/depcomp \
 	$(top_srcdir)/config/mkinstalldirs \
 	$(top_srcdir)/src/Makeinclude.config \
 	$(top_srcdir)/src/Makeinclude.rules
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-
-#############################################################################
-# Automake rules
-#############################################################################
-pkglibdir = @my_pkglibdir@
-pkglibexecdir = @my_pkglibexecdir@
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
@@ -349,14 +292,6 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
 LIBDWARF_COPY = @LIBDWARF_COPY@
-
-#############################################################################
-# Common settings
-#############################################################################
-
-#############################################################################
-# Local settings
-#############################################################################
 LIBDWARF_INC = @LIBDWARF_INC@
 LIBDWARF_LIB = @LIBDWARF_LIB@
 LIBELF_COPY = @LIBELF_COPY@
@@ -561,47 +496,51 @@ HPCLIB_ISA = $(top_builddir)/src/lib/isa/libHPCisa.la
 HPCLIB_XML = $(top_builddir)/src/lib/xml/libHPCxml.la
 HPCLIB_Support = $(top_builddir)/src/lib/support/libHPCsupport.la
 HPCLIB_SupportLean = $(top_builddir)/src/lib/support-lean/libHPCsupport-lean.la
+
+#############################################################################
+# Common settings
+#############################################################################
+
+#############################################################################
+# Local settings
+#############################################################################
+EXT_LIBS = lib/hpctoolkit/ext-libs
 @OPT_DYNINST_LIBDW_FALSE@MY_ELF_DWARF = -L$(LIBDWARF_LIB) -ldwarf -L$(LIBELF_LIB) -lelf
 @OPT_DYNINST_LIBDW_TRUE@MY_ELF_DWARF = -L$(LIBELF_LIB) -ldw -lelf
 MYSOURCES = \
-	main.cpp \
-	Args.hpp Args.cpp
+	main.cpp args.cpp
 
-MYCFLAGS = @HOST_CFLAGS@   $(HPC_IFLAGS) @BINUTILS_IFLAGS@
-MYCXXFLAGS = @HOST_CXXFLAGS@ $(HPC_IFLAGS) @BINUTILS_IFLAGS@ @XERCES_IFLAGS@
+MYCFLAGS = @HOST_CFLAGS@ $(HPC_IFLAGS) @BINUTILS_IFLAGS@ \
+	@VALGRIND_IFLAGS@ $(am__append_1)
+MYCXXFLAGS = @HOST_CXXFLAGS@ $(HPC_IFLAGS) @BINUTILS_IFLAGS@ \
+	@XERCES_IFLAGS@ @BOOST_IFLAGS@ @VALGRIND_IFLAGS@ \
+	$(am__append_2)
 MYLDFLAGS = \
+	-Wl,-rpath='$(prefix)/$(EXT_LIBS)' \
+	-Wl,-rpath='$$ORIGIN/../$(EXT_LIBS)' \
 	@HOST_CXXFLAGS@ \
 	@XERCES_LDFLAGS@ \
-	@LZMA_LDFLAGS_DYN@
+	@LZMA_LDFLAGS_DYN@ \
+    -L@LIBELF_LIB@ -ldw -lelf
 
 MYLDADD = \
 	@HOST_LIBTREPOSITORY@ \
-	$(HPCLIB_Analysis) \
-	$(HPCLIB_Banal_Simple) \
-	$(HPCLIB_ProfXML) \
-	$(HPCLIB_Prof) \
-	$(HPCLIB_Binutils) \
+	$(HPCLIB_Profile) \
 	$(HPCLIB_ProfLean) \
-	$(HPCLIB_ISA) \
-	$(MY_LIB_XED) \
-	$(HPCLIB_XML) \
-	$(HPCLIB_Support) \
 	$(HPCLIB_SupportLean) \
 	$(MY_ELF_DWARF) \
 	@LZMA_LDFLAGS_STAT@ \
 	@XERCES_LDLIBS@ \
 	@BINUTILS_LIBS@ \
-	@HOST_HPCPROFTT_LDFLAGS@
+	@BOOST_LFLAGS@ \
+	@HOST_HPCPROF_LDFLAGS@
 
-@HOST_CPU_X86_FAMILY_FALSE@MY_LIB_XED = 
-@HOST_CPU_X86_FAMILY_TRUE@MY_LIB_XED = $(XED2_LIB_FLAGS)
 MYCLEAN = @HOST_LIBTREPOSITORY@
-pkglibexec_SCRIPTS = hpcproftt
-hpcproftt_bin_SOURCES = $(MYSOURCES)
-hpcproftt_bin_CFLAGS = $(MYCFLAGS)
-hpcproftt_bin_CXXFLAGS = $(MYCXXFLAGS)
-hpcproftt_bin_LDFLAGS = $(MYLDFLAGS)
-hpcproftt_bin_LDADD = $(MYLDADD)
+hpcprof2_SOURCES = $(MYSOURCES)
+hpcprof2_CFLAGS = $(MYCFLAGS)
+hpcprof2_CXXFLAGS = $(MYCXXFLAGS)
+hpcprof2_LDFLAGS = $(MYLDFLAGS)
+hpcprof2_LDADD = $(MYLDADD)
 MOSTLYCLEANFILES = $(MYCLEAN)
 
 # Assumes includer sets MYCXXFLAGS and MYCFLAGS
@@ -624,9 +563,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/tool/hpcproftt/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/tool/hpcprof2/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign src/tool/hpcproftt/Makefile
+	  $(AUTOMAKE) --foreign src/tool/hpcprof2/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -645,14 +584,12 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-hpcproftt: $(top_builddir)/config.status $(srcdir)/hpcproftt.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-install-pkglibexecPROGRAMS: $(pkglibexec_PROGRAMS)
+install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
-	@list='$(pkglibexec_PROGRAMS)'; test -n "$(pkglibexecdir)" || list=; \
+	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(pkglibexecdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(pkglibexecdir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
 	fi; \
 	for p in $$list; do echo "$$p $$p"; done | \
 	sed 's/$(EXEEXT)$$//' | \
@@ -672,24 +609,24 @@ install-pkglibexecPROGRAMS: $(pkglibexec_PROGRAMS)
 	while read type dir files; do \
 	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
 	    test -z "$$files" || { \
-	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(pkglibexecdir)$$dir'"; \
-	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(pkglibexecdir)$$dir" || exit $$?; \
+	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(bindir)$$dir'"; \
+	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
 	    } \
 	; done
 
-uninstall-pkglibexecPROGRAMS:
+uninstall-binPROGRAMS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(pkglibexec_PROGRAMS)'; test -n "$(pkglibexecdir)" || list=; \
+	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
 	files=`for p in $$list; do echo "$$p"; done | \
 	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
 	      -e 's/$$/$(EXEEXT)/' \
 	`; \
 	test -n "$$list" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(pkglibexecdir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(pkglibexecdir)" && rm -f $$files
+	echo " ( cd '$(DESTDIR)$(bindir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(bindir)" && rm -f $$files
 
-clean-pkglibexecPROGRAMS:
-	@list='$(pkglibexec_PROGRAMS)'; test -n "$$list" || exit 0; \
+clean-binPROGRAMS:
+	@list='$(bin_PROGRAMS)'; test -n "$$list" || exit 0; \
 	echo " rm -f" $$list; \
 	rm -f $$list || exit $$?; \
 	test -n "$(EXEEXT)" || exit 0; \
@@ -697,44 +634,9 @@ clean-pkglibexecPROGRAMS:
 	echo " rm -f" $$list; \
 	rm -f $$list
 
-hpcproftt-bin$(EXEEXT): $(hpcproftt_bin_OBJECTS) $(hpcproftt_bin_DEPENDENCIES) $(EXTRA_hpcproftt_bin_DEPENDENCIES) 
-	@rm -f hpcproftt-bin$(EXEEXT)
-	$(AM_V_CXXLD)$(hpcproftt_bin_LINK) $(hpcproftt_bin_OBJECTS) $(hpcproftt_bin_LDADD) $(LIBS)
-install-pkglibexecSCRIPTS: $(pkglibexec_SCRIPTS)
-	@$(NORMAL_INSTALL)
-	@list='$(pkglibexec_SCRIPTS)'; test -n "$(pkglibexecdir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(pkglibexecdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(pkglibexecdir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
-	done | \
-	sed -e 'p;s,.*/,,;n' \
-	    -e 'h;s|.*|.|' \
-	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
-	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
-	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
-	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
-	      if (++n[d] == $(am__install_max)) { \
-		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
-	    else { print "f", d "/" $$4, $$1 } } \
-	  END { for (d in files) print "f", d, files[d] }' | \
-	while read type dir files; do \
-	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
-	     test -z "$$files" || { \
-	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(pkglibexecdir)$$dir'"; \
-	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(pkglibexecdir)$$dir" || exit $$?; \
-	     } \
-	; done
-
-uninstall-pkglibexecSCRIPTS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(pkglibexec_SCRIPTS)'; test -n "$(pkglibexecdir)" || exit 0; \
-	files=`for p in $$list; do echo "$$p"; done | \
-	       sed -e 's,.*/,,;$(transform)'`; \
-	dir='$(DESTDIR)$(pkglibexecdir)'; $(am__uninstall_files_from_dir)
+hpcprof2$(EXEEXT): $(hpcprof2_OBJECTS) $(hpcprof2_DEPENDENCIES) $(EXTRA_hpcprof2_DEPENDENCIES) 
+	@rm -f hpcprof2$(EXEEXT)
+	$(AM_V_CXXLD)$(hpcprof2_LINK) $(hpcprof2_OBJECTS) $(hpcprof2_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -742,8 +644,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hpcproftt_bin-Args.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hpcproftt_bin-main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hpcprof2-args.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hpcprof2-main.Po@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -769,33 +671,33 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
 
-hpcproftt_bin-main.o: main.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -MT hpcproftt_bin-main.o -MD -MP -MF $(DEPDIR)/hpcproftt_bin-main.Tpo -c -o hpcproftt_bin-main.o `test -f 'main.cpp' || echo '$(srcdir)/'`main.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcproftt_bin-main.Tpo $(DEPDIR)/hpcproftt_bin-main.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='main.cpp' object='hpcproftt_bin-main.o' libtool=no @AMDEPBACKSLASH@
+hpcprof2-main.o: main.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -MT hpcprof2-main.o -MD -MP -MF $(DEPDIR)/hpcprof2-main.Tpo -c -o hpcprof2-main.o `test -f 'main.cpp' || echo '$(srcdir)/'`main.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcprof2-main.Tpo $(DEPDIR)/hpcprof2-main.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='main.cpp' object='hpcprof2-main.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -c -o hpcproftt_bin-main.o `test -f 'main.cpp' || echo '$(srcdir)/'`main.cpp
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -c -o hpcprof2-main.o `test -f 'main.cpp' || echo '$(srcdir)/'`main.cpp
 
-hpcproftt_bin-main.obj: main.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -MT hpcproftt_bin-main.obj -MD -MP -MF $(DEPDIR)/hpcproftt_bin-main.Tpo -c -o hpcproftt_bin-main.obj `if test -f 'main.cpp'; then $(CYGPATH_W) 'main.cpp'; else $(CYGPATH_W) '$(srcdir)/main.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcproftt_bin-main.Tpo $(DEPDIR)/hpcproftt_bin-main.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='main.cpp' object='hpcproftt_bin-main.obj' libtool=no @AMDEPBACKSLASH@
+hpcprof2-main.obj: main.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -MT hpcprof2-main.obj -MD -MP -MF $(DEPDIR)/hpcprof2-main.Tpo -c -o hpcprof2-main.obj `if test -f 'main.cpp'; then $(CYGPATH_W) 'main.cpp'; else $(CYGPATH_W) '$(srcdir)/main.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcprof2-main.Tpo $(DEPDIR)/hpcprof2-main.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='main.cpp' object='hpcprof2-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -c -o hpcproftt_bin-main.obj `if test -f 'main.cpp'; then $(CYGPATH_W) 'main.cpp'; else $(CYGPATH_W) '$(srcdir)/main.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -c -o hpcprof2-main.obj `if test -f 'main.cpp'; then $(CYGPATH_W) 'main.cpp'; else $(CYGPATH_W) '$(srcdir)/main.cpp'; fi`
 
-hpcproftt_bin-Args.o: Args.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -MT hpcproftt_bin-Args.o -MD -MP -MF $(DEPDIR)/hpcproftt_bin-Args.Tpo -c -o hpcproftt_bin-Args.o `test -f 'Args.cpp' || echo '$(srcdir)/'`Args.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcproftt_bin-Args.Tpo $(DEPDIR)/hpcproftt_bin-Args.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='Args.cpp' object='hpcproftt_bin-Args.o' libtool=no @AMDEPBACKSLASH@
+hpcprof2-args.o: args.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -MT hpcprof2-args.o -MD -MP -MF $(DEPDIR)/hpcprof2-args.Tpo -c -o hpcprof2-args.o `test -f 'args.cpp' || echo '$(srcdir)/'`args.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcprof2-args.Tpo $(DEPDIR)/hpcprof2-args.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='args.cpp' object='hpcprof2-args.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -c -o hpcproftt_bin-Args.o `test -f 'Args.cpp' || echo '$(srcdir)/'`Args.cpp
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -c -o hpcprof2-args.o `test -f 'args.cpp' || echo '$(srcdir)/'`args.cpp
 
-hpcproftt_bin-Args.obj: Args.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -MT hpcproftt_bin-Args.obj -MD -MP -MF $(DEPDIR)/hpcproftt_bin-Args.Tpo -c -o hpcproftt_bin-Args.obj `if test -f 'Args.cpp'; then $(CYGPATH_W) 'Args.cpp'; else $(CYGPATH_W) '$(srcdir)/Args.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcproftt_bin-Args.Tpo $(DEPDIR)/hpcproftt_bin-Args.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='Args.cpp' object='hpcproftt_bin-Args.obj' libtool=no @AMDEPBACKSLASH@
+hpcprof2-args.obj: args.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -MT hpcprof2-args.obj -MD -MP -MF $(DEPDIR)/hpcprof2-args.Tpo -c -o hpcprof2-args.obj `if test -f 'args.cpp'; then $(CYGPATH_W) 'args.cpp'; else $(CYGPATH_W) '$(srcdir)/args.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hpcprof2-args.Tpo $(DEPDIR)/hpcprof2-args.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='args.cpp' object='hpcprof2-args.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcproftt_bin_CXXFLAGS) $(CXXFLAGS) -c -o hpcproftt_bin-Args.obj `if test -f 'Args.cpp'; then $(CYGPATH_W) 'Args.cpp'; else $(CYGPATH_W) '$(srcdir)/Args.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hpcprof2_CXXFLAGS) $(CXXFLAGS) -c -o hpcprof2-args.obj `if test -f 'args.cpp'; then $(CYGPATH_W) 'args.cpp'; else $(CYGPATH_W) '$(srcdir)/args.cpp'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -887,9 +789,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS) $(SCRIPTS)
+all-am: Makefile $(PROGRAMS)
 installdirs:
-	for dir in "$(DESTDIR)$(pkglibexecdir)" "$(DESTDIR)$(pkglibexecdir)"; do \
+	for dir in "$(DESTDIR)$(bindir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -925,8 +827,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-libtool clean-pkglibexecPROGRAMS \
-	mostlyclean-am
+clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -952,9 +853,8 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-pkglibexecPROGRAMS install-pkglibexecSCRIPTS
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
+install-exec-am: install-binPROGRAMS
+
 install-html: install-html-am
 
 install-html-am:
@@ -993,25 +893,23 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-pkglibexecPROGRAMS uninstall-pkglibexecSCRIPTS
+uninstall-am: uninstall-binPROGRAMS
 
-.MAKE: install-am install-exec-am install-strip
+.MAKE: install-am install-strip
 
-.PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
-	clean-libtool clean-pkglibexecPROGRAMS cscopelist-am ctags \
-	ctags-am distclean distclean-compile distclean-generic \
+.PHONY: CTAGS GTAGS TAGS all all-am check check-am clean \
+	clean-binPROGRAMS clean-generic clean-libtool cscopelist-am \
+	ctags ctags-am distclean distclean-compile distclean-generic \
 	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-exec-hook install-html install-html-am \
+	html-am info info-am install install-am install-binPROGRAMS \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
 	install-info install-info-am install-man install-pdf \
-	install-pdf-am install-pkglibexecPROGRAMS \
-	install-pkglibexecSCRIPTS install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-pkglibexecPROGRAMS uninstall-pkglibexecSCRIPTS
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS
 
 .PRECIOUS: Makefile
 
@@ -1029,9 +927,6 @@ define HPC_moveIfStaticallyLinked
 endef
 
 #############################################################################
-
-install-exec-hook:
-	$(call HPC_moveIfStaticallyLinked,$(DESTDIR)$(pkglibexecdir)/hpcproftt-bin$(EXEEXT),$(DESTDIR)$(bindir)/hpcproftt$(EXEEXT))
 
 %.cpp.pp : %.cpp
 	$(CXXCPP) $(MYCPPFLAGS_0_CXX) $< > $@

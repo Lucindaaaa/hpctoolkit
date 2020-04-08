@@ -80,13 +80,13 @@ public:
 
   void notifyWavefront(hpctoolkit::DataClass::singleton_t) noexcept override;
   void notifyThreadFinal(const hpctoolkit::Thread::Temporary&) override;
-  void merge();
+  void merge(int);
 
 private:
   hpctoolkit::stdshim::filesystem::path dir;
-  void merge0(MPI_File&, const std::vector<std::pair<hpctoolkit::ThreadAttributes,
+  void merge0(int, MPI_File&, const std::vector<std::pair<hpctoolkit::ThreadAttributes,
     hpctoolkit::stdshim::filesystem::path>>&);
-  void mergeN(MPI_File&);
+  void mergeN(int, MPI_File&);
 
   std::vector<std::reference_wrapper<const hpctoolkit::Context>> contexts;
   unsigned int ctxMaxId;

@@ -52,7 +52,7 @@ using namespace hpctoolkit;
 
 // Merge function, only called on rank 0. Split since there's the extra
 // argument with all the bits.
-void SparseDB::merge0(MPI_File& outfile, const std::vector<std::pair<ThreadAttributes,
+void SparseDB::merge0(int threads, MPI_File& outfile, const std::vector<std::pair<ThreadAttributes,
     stdshim::filesystem::path>>& inputs) {
 
   // At the moment, all we do is write out a series of lines about what files
@@ -72,7 +72,7 @@ void SparseDB::merge0(MPI_File& outfile, const std::vector<std::pair<ThreadAttri
 }
 
 // Merge function, only called on rank >0.
-void SparseDB::mergeN(MPI_File& outfile) {
+void SparseDB::mergeN(int threads, MPI_File& outfile) {
   // At the moment, the workers don't do anything. Everything is handled via
   // the master rank 0.
 }

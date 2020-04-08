@@ -163,7 +163,7 @@ int rankN(ProfArgs&& args, int world_rank, int world_size) {
 
     ProfilePipeline pipeline(std::move(pipelineB2), args.threads);
     pipeline.run();
-    if(sdb) sdb->merge();
+    if(sdb) sdb->merge(args.threads);
   }
 
   return 0;

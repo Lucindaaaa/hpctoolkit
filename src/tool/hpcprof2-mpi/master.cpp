@@ -219,7 +219,7 @@ int rank0(ProfArgs&& args, int world_rank, int world_size) {
   // Create and drain the Pipeline, that's all we do.
   ProfilePipeline pipeline(std::move(pipelineB), args.threads);
   pipeline.run();
-  if(sdb) sdb->merge();
+  if(sdb) sdb->merge(args.threads);
 
   return 0;
 }

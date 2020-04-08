@@ -166,7 +166,7 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
 
 void SparseDB::write() {};
 
-void SparseDB::merge() {
+void SparseDB::merge(int threads) {
   int world_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   if(world_rank != 0) {
@@ -196,7 +196,7 @@ void SparseDB::merge() {
     MPI_File_set_size(of, 0);
 
     // Shift into the worker code
-    mergeN(of);
+    mergeN(threads, of);
 
     // Close up
     MPI_File_close(&of);
@@ -234,7 +234,7 @@ void SparseDB::merge() {
     MPI_File_set_size(of, 0);
 
     // Shift into the worker code
-    merge0(of, woutputs);
+    merge0(threads, of, woutputs);
 
     // Close up and clean up
     MPI_File_close(&of);

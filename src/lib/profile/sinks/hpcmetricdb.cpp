@@ -187,9 +187,9 @@ void HPCMetricDB::notifyThreadFinal(const Thread::Temporary& tt) {
 
   // Write the header, so we know where to start. Each Context takes up two
   // "nodes," and then node 0 is skipped to match EXML ids.
-  hpcmetricDB_fmt_hdr_t hdr = {
-    .numNodes = (ctxMaxId+1)*2 + 1, .numMetrics = (uint32_t)metrics.size(),
-  };
+  hpcmetricDB_fmt_hdr_t hdr;
+  hdr.numNodes = (ctxMaxId+1)*2 + 1;
+  hdr.numMetrics = (uint32_t)metrics.size();
   if(!dry)
     if(hpcmetricDB_fmt_hdr_fwrite(&hdr, of) == HPCFMT_ERR)
       util::log::fatal() << "Error writing to metric-db file!";

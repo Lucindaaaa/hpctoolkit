@@ -782,12 +782,12 @@ case "${host}" in
 esac
 
 # Grab optimization flags
-HOST_CFLAGS="${HOST_CFLAGS} ${my_opt_cflags} -flto"
-HOST_CXXFLAGS="${HOST_CXXFLAGS} ${my_opt_cxxflags} -flto"
+HOST_CFLAGS="${HOST_CFLAGS} ${my_opt_cflags}"
+HOST_CXXFLAGS="${HOST_CXXFLAGS} ${my_opt_cxxflags}"
 
 # Several programs need system's demangle option
 HOST_HPCSTRUCT_LDFLAGS="${HOST_HPCSTRUCT_LDFLAGS} ${my_demangle_ldflags}"
-HOST_HPCPROF_LDFLAGS="${HOST_HPCPROF_LDFLAGS} ${my_demangle_ldflags} -flto"
+HOST_HPCPROF_LDFLAGS="${HOST_HPCPROF_LDFLAGS} ${my_demangle_ldflags}"
 HOST_XPROF_LDFLAGS="${HOST_XPROF_LDFLAGS} ${my_demangle_ldflags}"
 
 

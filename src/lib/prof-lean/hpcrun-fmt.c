@@ -997,7 +997,7 @@ int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->num_nzval),sparse_fs->file));
     sparse_fs->val_offset = sparse_fs->footer[5]+ 12;
     sparse_fs->metric_pos_offset = sparse_fs->val_offset + 8*(sparse_fs->num_nzval);
-    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + 10*(sparse_fs->num_nzval) +8;
+    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + 2*(sparse_fs->num_nzval) +8; //change 10 to 2 for m_offset removal
   }
 
   //get the cct id for the context we are going to read
@@ -1012,7 +1012,7 @@ int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&metric_block_pos,sparse_fs->file));
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->cur_block_end),sparse_fs->file));
   if(metric_block_pos == sparse_fs->num_nzval) return 0; //might not be end of cct, but rest blocks are all empty
-  fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + 10*metric_block_pos),SEEK_SET);
+  fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + 2*metric_block_pos),SEEK_SET); //change 10 to 2 for m_offset removal
   sparse_fs->cur_block++;
 
   return id;
@@ -1028,18 +1028,19 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
     return HPCFMT_ERR;
   }
   size_t cur_pos = ftell(sparse_fs->file);
-  if(cur_pos == sparse_fs->metric_pos_offset + 10*(sparse_fs->cur_block_end) )return 0;
+  if(cur_pos == sparse_fs->metric_pos_offset + 2*(sparse_fs->cur_block_end) )return 0; //change 10 to 2 for m_offset removal
 
   uint16_t id;
   uint64_t offset;
   HPCFMT_ThrowIfError(hpcfmt_int2_fread(&id,sparse_fs->file));
-  HPCFMT_ThrowIfError(hpcfmt_int8_fread(&offset,sparse_fs->file));
+  //HPCFMT_ThrowIfError(hpcfmt_int8_fread(&offset,sparse_fs->file));
   id ++; //match the metric id in metricTbl(starting as 1), it was recorded starting as 0
+  offset = (cur_pos - sparse_fs->metric_pos_offset)/2; //for one thread, each metric id only has one value
 
   //If MULTIPLE THREADS, then it will be a loop to get all values for one metric id
   fseek(sparse_fs->file,(sparse_fs->val_offset)+8*offset,SEEK_SET);
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(val->bits),sparse_fs->file));
-  fseek(sparse_fs->file,cur_pos+10,SEEK_SET); //set for next entry
+  fseek(sparse_fs->file,cur_pos+2,SEEK_SET); //set for next entry //change 10 to 2 for m_offset removal
 
   return id;
 }

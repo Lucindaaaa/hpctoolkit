@@ -45,6 +45,8 @@
 // ******************************************************* EndRiceCopyright *
 
 #include "sparse.hpp"
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <sstream>
 
@@ -61,8 +63,14 @@ void SparseDB::merge0(int threads, MPI_File& outfile, const std::vector<std::pai
   std::ostringstream ss;
   for(const auto& in: inputs) {
     const auto& attr = in.first;
+    //ss << "Thread [" << attr.mpirank() << "," << attr.threadid() << "] "
+    //   << "written in " << in.second.string() << "\n";
+
+    //YUMENG
+    struct stat buf;
+    stat(in.second.string().c_str(),&buf);
     ss << "Thread [" << attr.mpirank() << "," << attr.threadid() << "] "
-       << "written in " << in.second.string() << "\n";
+       << "written in " << in.second.string() << "with size: " << buf.st_size <<"\n";
   }
   std::string s = ss.str();
 

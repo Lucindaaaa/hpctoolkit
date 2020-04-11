@@ -1037,7 +1037,8 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
 		   std::string ctxtStr, const char* filename, FILE* outfs)
 {
   int ret;
-  
+
+
   // ------------------------------------------------------------
   // footer - YUMENG
   // ------------------------------------------------------------
@@ -1089,7 +1090,7 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
       ret = fmt_epoch_fread(myprof, infs, rFlags, hdr,
 			    ctxtStr, filename, outfs);
       if (ret == HPCFMT_EOF) {
-	break;
+	break; 
       }
     }
     catch (const Diagnostics::Exception& x) {
@@ -1176,6 +1177,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ----------------------------------------
   // loadmap
   // ----------------------------------------
+
   loadmap_t loadmap_tbl;
   ret = hpcrun_fmt_loadmap_fread(&loadmap_tbl, infs, malloc);
 
@@ -1188,7 +1190,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   if (outfs) {
     hpcrun_fmt_loadmap_fprint(&loadmap_tbl, outfs);
   }
-  
+
 
   // ------------------------------------------------------------
   // Create Profile
@@ -1203,6 +1205,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   // -------------------------
   // program name
   // -------------------------
+
   string progNm;
   val = hpcfmt_nvpairList_search(&(hdr.nvps), HPCRUN_FMT_NV_prog);
   if (val && strlen(val) > 0) {
@@ -1227,7 +1230,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   string mpiRankStr, tidStr;
 
   // val = hpcfmt_nvpairList_search(&(hdr.nvps), HPCRUN_FMT_NV_jobId);
-  
+ 
   val = hpcfmt_nvpairList_search(&(hdr.nvps), HPCRUN_FMT_NV_mpiRank);
   if (val) {
     mpiRankStr = val;
@@ -1296,7 +1299,7 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ----------------------------------------
   // make CallPath::Profile
   // ----------------------------------------
-  
+
   prof = new Profile(progNm);
 
   prof->m_fmtVersion = hdr.version;
@@ -1417,10 +1420,11 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
     DIAG_Assert(Logic::implies(mdesc.flags.fields.ty == MetricFlags_Ty_Final,
 			       !(rFlags & RFlg_MakeInclExcl)),
 		DIAG_UnexpectedInput);
-    
+   
     // ----------------------------------------
     // 1. Make 'regular'/'inclusive' metric descriptor
     // ----------------------------------------
+ 
     Metric::SampledDesc* m =
       new Metric::SampledDesc(nm, desc, mdesc.period, true/*isUnitsEvents*/,
 			      profFileName, profRelId, "HPCRUN", mdesc.flags.fields.show, false,

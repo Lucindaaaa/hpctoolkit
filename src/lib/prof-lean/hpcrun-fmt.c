@@ -829,7 +829,9 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
     }
 
     switch (mflags.fields.valFmt) {
-      default:
+      default: //used for printing tmp sparse-db files, it does not have metric_tbl included
+        fprintf(fs, " %g", x->values[i].r);
+	      break;
       case MetricFlags_ValFmt_Int:
 	      fprintf(fs, " %"PRIu64, x->values[i].i);
       	break;

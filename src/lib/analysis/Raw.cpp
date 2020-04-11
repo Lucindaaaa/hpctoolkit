@@ -102,6 +102,9 @@ Analysis::Raw::writeAsText(/*destination,*/ const char* filenm)
   else if (ty == ProfType_Flat) {
     writeAsText_flat(filenm);
   }
+  else if (ty == ProfType_SparseDBtmp) { //YUMENG
+    writeAsText_sparseDBtmp(filenm);
+  }
   else {
     DIAG_Die(DIAG_Unimplemented);
   }
@@ -122,6 +125,32 @@ Analysis::Raw::writeAsText_callpath(const char* filenm)
     throw;
   }
   delete prof;
+}
+
+//YUMENG
+void
+Analysis::Raw::writeAsText_sparseDBtmp(const char* filenm)
+{
+  if (!filenm) { return; }
+
+  try {
+    FILE* fs = hpcio_fopen_r(filenm);
+    if (!fs) {
+      DIAG_Throw("error opening tmp sparse-db file '" << filenm << "'");
+    }
+
+    hpcrun_fmt_sparse_metrics_t sm;
+    int ret = hpcrun_fmt_sparse_metrics_fread(&sm,fs);
+    if (ret != HPCFMT_OK) {
+      DIAG_Throw("error reading tmp sparse-db file '" << filenm << "'");
+    }
+    hpcrun_fmt_sparse_metrics_fprint(&sm,stdout,NULL, "  ");
+    hpcio_fclose(fs);
+  }
+  catch (...) {
+    DIAG_EMsg("While reading '" << filenm << "'...");
+    throw;
+  }
 }
 
 

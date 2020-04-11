@@ -94,7 +94,8 @@ enum ProfType_t {
   ProfType_Callpath,
   ProfType_CallpathMetricDB,
   ProfType_CallpathTrace,
-  ProfType_Flat
+  ProfType_Flat,
+  ProfType_SparseDBtmp //YUMENG: for development purpose only, check the output files from prof2 first round
 };
 
 ProfType_t

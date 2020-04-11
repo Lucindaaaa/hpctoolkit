@@ -157,7 +157,7 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
 
   // Spit it all out, and close up.
   if(hpcrun_fmt_sparse_metrics_fwrite(&sm, of) != HPCFMT_OK)
-    util::log::fatal() << "Error writing out temporary sparse-db!";
+    util::log::fatal() << "Error writing out temporary sparse-db!";  
   std::fclose(of);
 
   // Log the output for posterity

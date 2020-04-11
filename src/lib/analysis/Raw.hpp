@@ -87,6 +87,9 @@ void
 writeAsText_callpath(/*destination,*/ const char* filenm);
 
 void
+writeAsText_sparseDBtmp(const char* filenm); //YUMENG
+
+void
 writeAsText_callpathMetricDB(/*destination,*/ const char* filenm);
 
 void

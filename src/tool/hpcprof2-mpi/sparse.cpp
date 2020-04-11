@@ -105,14 +105,13 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
   // Allocate the blobs needed for the final output
   std::vector<hpcrun_metricVal_t> values;
   std::vector<uint16_t> mids;
-  std::vector<uint64_t> moffsets;
   std::vector<uint64_t> coffsets;
-  coffsets.reserve((ctxMaxId+1)*2 + 1);  // To match up with EXML ids.
+  coffsets.reserve(1 + (ctxMaxId+1)*2 + 1);  // To match up with EXML ids.
 
   // Now stitch together each Context's results
   for(const Context& c: contexts) {
     auto id = c.userdata[src.identifier()]*2 + 1;  // Convert to EXML id
-    coffsets.resize(id+1, mids.size());
+    coffsets.resize(id+1, values.size());
     for(const Metric& m: metrics) {
       const auto& ids = m.userdata[src.identifier()];
       auto vv = m.getFor(tt, c);
@@ -120,18 +119,16 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
       if(vv.first != 0) {
         v.r = vv.first;
         mids.push_back(ids.first);
-        moffsets.push_back(values.size());
         values.push_back(v);
       }
       if(vv.second != 0) {
         v.r = vv.second;
         mids.push_back(ids.second);
-        moffsets.push_back(values.size());
         values.push_back(v);
       }
     }
   }
-  coffsets.push_back(mids.size());  // One extra for ranges
+  coffsets.push_back(values.size());  // One extra for ranges
 
   // Put together the sparse_metrics structure
   hpcrun_fmt_sparse_metrics_t sm;
@@ -140,7 +137,6 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
   sm.num_cct = coffsets.size()-1;
   sm.values = values.data();
   sm.mid = mids.data();
-  sm.m_offset = moffsets.data();
   sm.cct_offsets = coffsets.data();
 
   // Set up the output temporary file.

@@ -112,7 +112,7 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
   // Now stitch together each Context's results
   for(const Context& c: contexts) {
     auto id = c.userdata[src.identifier()]*2 + 1;  // Convert to EXML id
-    coffsets.resize(id+1, coffsets.size());
+    coffsets.resize(id+1, mids.size());
     for(const Metric& m: metrics) {
       const auto& ids = m.userdata[src.identifier()];
       auto vv = m.getFor(tt, c);
@@ -131,12 +131,13 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
       }
     }
   }
+  coffsets.push_back(mids.size());  // One extra for ranges
 
   // Put together the sparse_metrics structure
   hpcrun_fmt_sparse_metrics_t sm;
-  sm.tid = 0;
+  sm.tid = t.attributes.has_threadid() ? t.attributes.threadid() : 0;
   sm.num_vals = values.size();
-  sm.num_cct = coffsets.size();
+  sm.num_cct = coffsets.size()-1;
   sm.values = values.data();
   sm.mid = mids.data();
   sm.m_offset = moffsets.data();

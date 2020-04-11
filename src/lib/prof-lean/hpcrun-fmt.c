@@ -769,10 +769,10 @@ hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
   }
 
   x->mid = (uint16_t *) malloc((x->num_vals)*sizeof(uint16_t));
-  x->m_offset = (uint64_t *) malloc((x->num_vals)*sizeof(uint64_t));
+  //x->m_offset = (uint64_t *) malloc((x->num_vals)*sizeof(uint64_t));
   for (int i = 0; i < x->num_vals; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int2_fread(&x->mid[i], fs));
-    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->m_offset[i], fs));
+    //HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->m_offset[i], fs));
   }
 
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->num_cct), fs));
@@ -798,7 +798,9 @@ hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x,FILE* fs)
 
   for (int i = 0; i < x->num_vals; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int2_fwrite(x->mid[i], fs));
-    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->m_offset[i], fs));
+    //YUMENG: TODO: no need to collect info at first place, for now just stop writing it
+    //HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->m_offset[i], fs));
+    
   }
 
   HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->num_cct, fs));
@@ -846,9 +848,10 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
   }
   fprintf(fs, ")\n");
 
-  fprintf(fs, "%s(metric positions (id:offset): ",pre);
+  fprintf(fs, "%s(metric id: ",pre);
   for (uint i = 0; i < x->num_vals; ++i) {
-    fprintf(fs, "%d:%d", x->mid[i],x->m_offset[i]);
+    //fprintf(fs, "%d:%d", x->mid[i],x->m_offset[i]);
+    fprintf(fs, "%d", x->mid[i]);
     if (i + 1 < x->num_vals) {
       fprintf(fs, " ");
     }

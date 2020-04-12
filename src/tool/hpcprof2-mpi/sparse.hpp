@@ -81,6 +81,7 @@ public:
   void notifyWavefront(hpctoolkit::DataClass::singleton_t) noexcept override;
   void notifyThreadFinal(const hpctoolkit::Thread::Temporary&) override;
   void merge(int);
+  void exscan(std::vector<std::pair<uint32_t, uint64_t>>& data); //YUMENG
 
 private:
   hpctoolkit::stdshim::filesystem::path dir;

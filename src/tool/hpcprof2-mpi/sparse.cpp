@@ -54,6 +54,10 @@
 #include <sstream>
 #include <iomanip>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <omp.h>
+
 using namespace hpctoolkit;
 
 SparseDB::SparseDB(const stdshim::filesystem::path& p) : dir(p), ctxMaxId(0), outputCnt(0) {
@@ -170,11 +174,39 @@ void SparseDB::write() {};
 void SparseDB::merge(int threads) {
   int world_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  int world_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   if(world_rank != 0) {
+    // Create a vector, (thread id:profile_size) 
+    // TODO: need to be more unique id to identify each profile
+    std::vector<std::pair<uint32_t, uint64_t>> profile_sizes;
+    uint64_t my_size = 0;
+    for(const auto& tp: outputs.citerate()) {
+      struct stat buf;
+      stat(tp.second.string().c_str(),&buf);
+      my_size += buf.st_size;
+      profile_sizes.emplace_back(tp.first->attributes.threadid(),buf.st_size);
+    }
+
+    //local exscan to get local offsets
+    omp_set_num_threads(threads/world_size);
+    exscan(profile_sizes); //now profile_sizes have corresponding local offsets 
+    std::cout << "rank " << world_rank << " with size " << my_size << "\n";
+
+    //tell rank 0 about my_size
+    MPI_Gather(&my_size,1, mpi_data<uint64_t>::type,NULL,1,mpi_data<uint64_t>::type,0,MPI_COMM_WORLD);
+
+
+    
+
+
+
+
     // Tell rank 0 all about our data
     {
       Gather<uint32_t> g;
       GatherStrings gs;
+      printf("For outputs not zeor, size is : %d\n", outputs.size());
       for(const auto& tp: outputs.citerate()) {
         auto& attr = tp.first->attributes;
         g.add(attr.has_hostid() ? attr.hostid() : 0);
@@ -182,6 +214,7 @@ void SparseDB::merge(int threads) {
         g.add(attr.has_threadid() ? attr.threadid() : 0);
         g.add(attr.has_procid() ? attr.procid() : 0);
         gs.add(tp.second.string());
+        printf("I am rank %d, I have tid: %d, r: %d\n", world_rank,attr.has_threadid() ? attr.threadid() : 0,attr.has_mpirank() ? attr.mpirank() : 0);
       }
       g.gatherN(6);
       gs.gatherN(7);
@@ -202,6 +235,39 @@ void SparseDB::merge(int threads) {
     // Close up
     MPI_File_close(&of);
   } else {
+    // Create a vector, (thread id:profile_size) 
+    // TODO: need to be more unique id to identify each profile
+    std::vector<std::pair<uint32_t, uint64_t>> profile_sizes;
+    uint64_t my_size = 0;
+    for(const auto& tp: outputs.citerate()) {
+      struct stat buf;
+      stat(tp.second.string().c_str(),&buf);
+      my_size += buf.st_size;
+      profile_sizes.emplace_back(tp.first->attributes.threadid(),buf.st_size);
+    }
+    //local exscan to get local offsets
+    omp_set_num_threads(threads/world_size);
+    exscan(profile_sizes); //now profile_sizes have corresponding local offsets 
+    std::cout << "(0)rank " << world_rank << " with size " << my_size << "\n";
+
+    std::vector<uint64_t> rank_sizes (world_size);
+    //gather sizes from all workers
+    MPI_Gather(&my_size,1, mpi_data<uint64_t>::type,rank_sizes.data(),1,mpi_data<uint64_t>::type,0,MPI_COMM_WORLD);
+    for(auto rs: rank_sizes) std::cout << rs << " ";
+    std::cout << " \n";
+
+
+
+
+
+
+
+
+
+
+
+
+
     // Gather the data from all the workers, build a big attributes table
     std::vector<std::pair<ThreadAttributes, stdshim::filesystem::path>> woutputs;
     {
@@ -222,8 +288,12 @@ void SparseDB::merge(int threads) {
     }
 
     // Copy our bits in too.
-    for(const auto& tp: outputs.citerate())
-      woutputs.emplace_back(tp.first->attributes, tp.second);
+    printf("For outputs, size is : %d\n", outputs.size());
+    for(const auto& tp: outputs.citerate()){
+      auto& attr = tp.first->attributes;
+       printf("I am rank %d (should be 0), I have tid: %d, r: %d\n", world_rank,attr.has_threadid() ? attr.threadid() : 0,attr.has_mpirank() ? attr.mpirank() : 0);
+       woutputs.emplace_back(tp.first->attributes, tp.second);
+    }
 
     // Open up the output file. We use MPI's I/O substrate to make sure things
     // work in the end. Probably.
@@ -243,3 +313,59 @@ void SparseDB::merge(int threads) {
     /*   stdshim::filesystem::remove(tp.second); */
   }
 }
+
+void SparseDB::exscan(std::vector<std::pair<uint32_t, uint64_t>>& data) {
+  int n = data.size();
+  std::vector<uint64_t> result (n);
+
+  #pragma omp parallel shared(result,data,n)
+  {
+    int p = omp_get_num_threads();
+    int block = n/(p+1);
+
+    int tid = omp_get_thread_num();
+    int sum = 0;
+    for(int i = tid*block; i<(tid+1)*block;i++){
+      result.at(i) = data.at(i).second + sum;
+      sum = result.at(i);
+    }
+
+    #pragma omp barrier   
+    #pragma omp master 
+    { 
+      int offset = 0;
+      for(int i = 1; i <= p; i++){
+        offset += result.at(i*block - 1);
+        result.at(i*block) = offset; 
+      }
+    }
+
+    #pragma omp barrier
+    int my_offset = result.at((tid+1)*block);
+    for(int i = (tid+1)*block; i <= (tid+2)*block - 1; i++){
+      result.at(i) = data.at(i).second + my_offset;
+      my_offset = result.at(i);
+    }
+
+    #pragma omp barrier
+    if(n > (p+1)*block ){
+      #pragma omp master
+      {
+        my_offset = result.at((p+1)*block - 1);
+        for(int i = (p+1)*block; i<n; i++){
+          result.at(i) = data.at(i).second + my_offset;
+          my_offset = result.at(i);
+        }
+      }    
+    }
+
+    #pragma omp barrier
+    data.at(0).second = 0;
+    for(int i = 1; i<n;i++){
+      data.at(i).second = result.at(i-1);
+    }
+  }
+
+}
+
+

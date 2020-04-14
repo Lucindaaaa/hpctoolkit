@@ -393,6 +393,7 @@ void SparseDB::merge(int threads) {
 }
 #endif
 
+//YUMENG
 //multi-thread
 void SparseDB::exscan(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& data,std::vector<std::pair<uint32_t, uint64_t>>& re) {
   int n = data.size();

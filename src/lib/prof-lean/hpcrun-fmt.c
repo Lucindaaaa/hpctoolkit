@@ -806,7 +806,10 @@ hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x,FILE* fs)
   HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->num_cct, fs));
 
   for (int i = 0; i <= x->num_cct; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->cct_offsets[i], fs));
+    //uint64_t cct_off = x->cct_offsets[i+1] - x->cct_offsets[i]; 
+    //if(cct_off != 0){
+    //  HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->cct_offsets[i], fs));
+    //}
   }
 
   return HPCFMT_OK;

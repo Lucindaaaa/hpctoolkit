@@ -156,6 +156,7 @@ Analysis::Raw::writeAsText_sparseDBtmp(const char* filenm)
   }
 }
 
+//YUMENG
 void
 Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
 {

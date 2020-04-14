@@ -171,12 +171,14 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
 
 void SparseDB::write() {};
 
+//YUMENG
 void SparseDB::merge(int threads) {
   //
   //profile_sizes: vector of (thread id : its own size)
   //prof_offsets: vector of (thread id: local offset relative to its own file)
   //my_size: the size of this rank's profiles total
   //my_offset: the offset of my rank's profiles relative to the final giant file
+  //all_prof_offsets: global offsets for all profiles across ranks
   //
 
   int world_rank;
@@ -193,36 +195,34 @@ void SparseDB::merge(int threads) {
     my_size += buf.st_size;
     profile_sizes.emplace_back(tp.first,buf.st_size);    
   }
-  //for(auto ps : profile_sizes) std::cout << "thread id:" << ps.first <<" | size: "<<ps.second << "\n";
-  
 
   //local exscan to get local offsets
   std::vector<std::pair<uint32_t, uint64_t>> prof_offsets (profile_sizes.size());
   omp_set_num_threads(threads/world_size);
   exscan(profile_sizes,prof_offsets);
-  //for(auto ps : prof_offsets) std::cout << "thread id:" << ps.first <<" | offset: "<<ps.second << "\n";
 
-  //gather together and global exscan to get my_offset, scatter
-  //my_offset + local offsets = place to write this profile
+  //get global offsets, write thread offsets array
+  //my_offset + local offsets + bytes needed for thread offsets array = place to write this profile
   uint64_t my_offset;
   uint32_t total_num_prof = 0;
   if(world_rank == 0){
-    std::cout << "rank 0 first profile thread id" << prof_offsets.at(0).first <<"\n";
     std::vector<uint64_t> rank_sizes (world_size);
-    //gather sizes from all workers
+    //gather sizes from all workers, scatter/get local offset
     MPI_Gather(&my_size,1, mpi_data<uint64_t>::type,rank_sizes.data(),1,mpi_data<uint64_t>::type,0,MPI_COMM_WORLD);
     exscan(rank_sizes);
     MPI_Scatter(rank_sizes.data(),1,mpi_data<uint64_t>::type, &my_offset, 1, mpi_data<uint64_t>::type, 0 ,MPI_COMM_WORLD);  
 
-
-    //gather number of profiles 
+    //
+    //thread offset array
+    //
+    //gather number of profiles, get total number of profiles 
     uint32_t my_num_prof = prof_offsets.size();
     std::vector<uint32_t> rank_num_prof (world_size);
     MPI_Gather(&my_num_prof,1, mpi_data<uint32_t>::type,rank_num_prof.data(),1,mpi_data<uint32_t>::type,0,MPI_COMM_WORLD);
     for(auto np : rank_num_prof) total_num_prof += np;
     MPI_Bcast(&total_num_prof, 1, mpi_data<uint32_t>::type, 0, MPI_COMM_WORLD);
 
-    //gather offsets from all workers
+    //gather offsets from all workers, assign it to the thread-id place in all_prof_offsets
     std::vector<uint64_t> all_prof_offsets (total_num_prof);
     {
       auto og = Gather<uint64_t>::gather0(8);
@@ -235,24 +235,23 @@ void SparseDB::merge(int threads) {
         }
       }
     }
-    //rank 0's offsets
+    //rank 0's thread offsets
     for(auto i = 0; i<prof_offsets.size();i++){
       all_prof_offsets.at(prof_offsets.at(i).first) = prof_offsets.at(i).second+my_offset + (total_num_prof * 8) + 4;
     }
-    for(int i = 0; i<all_prof_offsets.size();i++){
-      std::cout << i << ":" << all_prof_offsets.at(i) << "\n";
-    }
-    std::cout << "\n" ;
-
+    //write thread offsets
     FILE* fs = fopen((dir / "thread_major_sparse.db").c_str(),"w+");
     tms_thread_offset_fwrite(all_prof_offsets.size(),&all_prof_offsets[0],fs);
     fclose(fs);
   
   }else{
-    //sizes
+    //tell rank 0 my size and get my_offset
     MPI_Gather(&my_size,1, mpi_data<uint64_t>::type,NULL,1,mpi_data<uint64_t>::type,0,MPI_COMM_WORLD);
     MPI_Scatter(NULL,1,mpi_data<uint64_t>::type, &my_offset, 1, mpi_data<uint64_t>::type, 0 ,MPI_COMM_WORLD);  
 
+    //
+    //thread offset array
+    //
     //number of profiles
     uint32_t my_num_prof = prof_offsets.size();
     MPI_Gather(&my_num_prof,1, mpi_data<uint32_t>::type,NULL,1,mpi_data<uint32_t>::type,0,MPI_COMM_WORLD);
@@ -269,9 +268,8 @@ void SparseDB::merge(int threads) {
     tg.gatherN(9);
 
   }
-  //std::cout << "rank " <<world_rank << " size: " << my_size << ", my_offset: " << my_offset << "\n";
 
-  //open the thread_major file together
+  //open the thread_major file together for profile writing
   MPI_File thread_major_f;
   MPI_File_open(MPI_COMM_WORLD, (dir / "thread_major_sparse.db").c_str(),
                   MPI_MODE_RDWR, MPI_INFO_NULL, &thread_major_f); 
@@ -280,10 +278,9 @@ void SparseDB::merge(int threads) {
   //Do the actual write
   #pragma omp parallel shared(profile_sizes,prof_offsets,my_offset)
   {
-    std::cout << "num of threads in write: " << omp_get_num_threads() << "\n";
     #pragma omp for
     for(auto i = 0; i<profile_sizes.size();i++){
-      //to read and write: need file name, size, offset
+      //to read and write: get file name, size, offset
       const hpctoolkit::Thread* threadp = profile_sizes.at(i).first;
       uint32_t tid = (uint32_t)threadp->attributes.threadid();
 
@@ -292,23 +289,35 @@ void SparseDB::merge(int threads) {
       MPI_Offset my_prof_offset = prof_offsets.at(i).second + my_offset + total_num_prof*8 + 4;
       if(tid != prof_offsets.at(i).first) std::cout << "Error in prof_offsets or profile_sizes\n";
 
+      //get all bytes from a profile
       std::ifstream input(fn.c_str(), std::ios::binary);
       std::vector<char> bytes(
          (std::istreambuf_iterator<char>(input)),
          (std::istreambuf_iterator<char>()));
       input.close();
 
+      //write at specific place
       MPI_Status stat;
       MPI_File_write_at(thread_major_f,my_prof_offset, bytes.data(), bytes.size(), MPI_BYTE, &stat);
     }
-  }
+  }//END OF OMP PARALLEL - writing process for all profiles
  
   MPI_File_close(&thread_major_f);
 
+}
 
-//TEMP code:
-if(world_rank != 0){
-  {
+
+#if 0
+//Jonathon's original code
+void SparseDB::merge(int threads) {
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  int world_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+  if(world_rank != 0) {  
+    // Tell rank 0 all about our data
+    {
       Gather<uint32_t> g;
       GatherStrings gs;
       for(const auto& tp: outputs.citerate()) {
@@ -321,9 +330,9 @@ if(world_rank != 0){
       }
       g.gatherN(6);
       gs.gatherN(7);
-  }
+    }
 
-  // Open up the output file. We use MPI's I/O substrate to make sure things
+    // Open up the output file. We use MPI's I/O substrate to make sure things
     // work in the end. Probably.
     MPI_File of;
     MPI_File_open(MPI_COMM_WORLD, (dir / "sparse.db").c_str(),
@@ -338,239 +347,7 @@ if(world_rank != 0){
     // Close up
     MPI_File_close(&of);
   
-}else{
-   // Gather the data from all the workers, build a big attributes table
-    std::vector<std::pair<ThreadAttributes, stdshim::filesystem::path>> woutputs;
-    {
-      auto g = Gather<uint32_t>::gather0(6);
-      auto gs = GatherStrings::gather0(7);
-      for(std::size_t peer = 1; peer < gs.size(); peer++) {
-        auto& a = g[peer];
-        auto& s = gs[peer];
-        for(std::size_t i = 0; i < s.size(); i++) {
-          ThreadAttributes attr;
-          attr.hostid(a.at(i*4));
-          attr.mpirank(a.at(i*4 + 1));
-          attr.threadid(a.at(i*4 + 2));
-          attr.procid(a.at(i*4 + 3));
-          woutputs.emplace_back(std::move(attr), std::move(s.at(i)));
-        }
-      }
-    }
-
-    // Copy our bits in too.
-    for(const auto& tp: outputs.citerate()){
-      auto& attr = tp.first->attributes;
-       woutputs.emplace_back(tp.first->attributes, tp.second);
-    }
-
-    // Open up the output file. We use MPI's I/O substrate to make sure things
-    // work in the end. Probably.
-    MPI_File of;
-    MPI_File_open(MPI_COMM_WORLD, (dir / "sparse.db").c_str(),
-                  MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &of);
-
-    // Make sure the file is truncated before we start writing stuff
-    MPI_File_set_size(of, 0);
-
-    // Shift into the worker code
-    merge0(threads, of, woutputs);
-
-    // Close up and clean up
-    MPI_File_close(&of);
-}
-
-}
-
-
-#if 0
-void SparseDB::merge(int threads) {
-  int world_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-  int world_size;
-  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-  if(world_rank != 0) {
-    
-    
-    // Create a vector, (thread id:profile_size) 
-    // TODO: need to be more unique id to identify each profile
-    std::vector<std::pair<uint32_t, uint64_t>> profile_sizes;
-    uint64_t my_size = 0;
-    for(const auto& tp: outputs.citerate()) {
-      struct stat buf;
-      stat(tp.second.string().c_str(),&buf);
-      my_size += buf.st_size;
-      profile_sizes.emplace_back(tp.first->attributes.threadid(),buf.st_size);
-    }
-    //local exscan to get local offsets
-    std::vector<std::pair<uint32_t, uint64_t>> prof_offsets (profile_sizes.size());
-    omp_set_num_threads(threads/world_size);
-    exscan(profile_sizes,prof_offsets); //now profile_sizes have corresponding local offsets 
-    std::cout << "rank " << world_rank << " with size " << my_size << "\n";
-
-    //tell rank 0 about my_size
-    MPI_Gather(&my_size,1, mpi_data<uint64_t>::type,NULL,1,mpi_data<uint64_t>::type,0,MPI_COMM_WORLD);
-    uint64_t my_offset;
-    MPI_Scatter(NULL,1,mpi_data<uint64_t>::type, &my_offset, 1, mpi_data<uint64_t>::type, 0 ,MPI_COMM_WORLD);
-    std::cout << "rank " << world_rank << " with offset " << my_offset << "\n";
-
-    MPI_File of;
-    MPI_File_open(MPI_COMM_WORLD, (dir / "thread_major_sparse.db").c_str(),
-                  MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &of);
-    /*
-    hpcrun_fmt_sparse_metrics_t sm;
-    std::FILE* tmpof = std::fopen(outputs.at(0).second.string().c_str(), "wb");
-    if(!tmpof) util::log::fatal() << "Unable to open temporary sparse-db file for output!";
-    if( hpcrun_fmt_sparse_metrics_fread(&sm, tmpof) != HPCFMT_OK)
-      util::log::fatal() << "Error reading temporary sparse-db!";  
-    std::fclose(tmpof);
-    uint64_t num_cct = sm.num_cct;
-
- 
-    std::vector<std::pair<uint64_t, uint64_t>> cct_sizes (num_cct);
-    std::vector<uint64_t> cct_offsets (num_cct);
-    */
-
-    #pragma omp parallel shared(ouputs) 
-    //private(cct_offsets)
-    {
-      #pragma omp for 
-      //reduction(+:cct_offsets[:num_cct])
-      for(const auto& tp: outputs.citerate()){
-        //hpcrun_fmt_sparse_metrics_t sm1;
-
-        /*
-        std::FILE* of1 = std::fopen(tp.second.string().c_str(), "wb");
-        if(!of1) util::log::fatal() << "Unable to open temporary sparse-db file for output!";
-        if( hpcrun_fmt_sparse_metrics_fread(&sm1, of1) != HPCFMT_OK)
-          util::log::fatal() << "Error reading temporary sparse-db!";  
-        cct_offsets += sm1.cct_offsets;
-        std::fclose(of1);
-        */
-
-        int tid = tp.first->attributes.threadid();
-        std::vector<std::pair<uint32_t, uint64_t>>::iterator it = std::find_if (prof_offsets.begin(), prof_offsets.end(),\
-          [&profile_sizes](const std::pair<uint32_t, uint64_t>& element){ return element.first == tid;} );
-        MPI_Offset prof_offset = my_offset + it->second;
-        std::vector<std::pair<uint32_t, uint64_t>>::iterator it1 = std::find_if (profile_sizes.begin(), profile_sizes.end(),\
-          [&profile_sizes](const std::pair<uint32_t, uint64_t>& e){ return e.first == tid;} );
-        int count = it1->second;
-
-
-        std::ifstream input(tp.second.string().c_str(), std::ios::binary);
-        std::vector<char> bytes(
-         (std::istreambuf_iterator<char>(input)),
-         (std::istreambuf_iterator<char>()));
-        input.close();
-        MPI_Status stat;
-        MPI_File_write_at(of, prof_offset, &bytes,
-                      count, MPI_Byte,&stat);    
-      }
-    }
-
-    MPI_File_close(&of);
-    
-
-
-
-
-    // Tell rank 0 all about our data
-    {
-      Gather<uint32_t> g;
-      GatherStrings gs;
-      printf("For outputs not zeor, size is : %d\n", outputs.size());
-      for(const auto& tp: outputs.citerate()) {
-        auto& attr = tp.first->attributes;
-        g.add(attr.has_hostid() ? attr.hostid() : 0);
-        g.add(attr.has_mpirank() ? attr.mpirank() : 0);
-        g.add(attr.has_threadid() ? attr.threadid() : 0);
-        g.add(attr.has_procid() ? attr.procid() : 0);
-        gs.add(tp.second.string());
-        printf("I am rank %d, I have tid: %d, r: %d\n", world_rank,attr.has_threadid() ? attr.threadid() : 0,attr.has_mpirank() ? attr.mpirank() : 0);
-      }
-      g.gatherN(6);
-      gs.gatherN(7);
-    }
-/*
-    // Open up the output file. We use MPI's I/O substrate to make sure things
-    // work in the end. Probably.
-    MPI_File of;
-    MPI_File_open(MPI_COMM_WORLD, (dir / "sparse.db").c_str(),
-                  MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &of);
-
-    // Make sure the file is truncated before we start writing stuff
-    MPI_File_set_size(of, 0);
-
-    // Shift into the worker code
-    mergeN(threads, of);
-
-    // Close up
-    MPI_File_close(&of);
-  */
   } else {
-    // Create a vector, (thread id:profile_size) 
-    // TODO: need to be more unique id to identify each profile
-    std::vector<std::pair<uint32_t, uint64_t>> profile_sizes;
-    uint64_t my_size = 0;
-    for(const auto& tp: outputs.citerate()) {
-      struct stat buf;
-      stat(tp.second.string().c_str(),&buf);
-      my_size += buf.st_size;
-      profile_sizes.emplace_back(tp.first->attributes.threadid(),buf.st_size);
-    }
-    //local exscan to get local offsets
-    std::vector<std::pair<uint32_t, uint64_t>> prof_offsets (profile_sizes.size());
-    omp_set_num_threads(threads/world_size);
-    exscan(profile_sizes,prof_offsets);//now profile_sizes have corresponding local offsets 
-    std::cout << "(0)rank " << world_rank << " with size " << my_size << "\n";
-
-    std::vector<uint64_t> rank_sizes (world_size);
-    //gather sizes from all workers
-    MPI_Gather(&my_size,1, mpi_data<uint64_t>::type,rank_sizes.data(),1,mpi_data<uint64_t>::type,0,MPI_COMM_WORLD);
-    for(auto rs: rank_sizes) std::cout << rs << " ";
-    std::cout << " \n";
-    exscan(rank_sizes);
-    for(auto rs: rank_sizes) std::cout << rs << " ";
-    std::cout << " \n";
-    uint64_t my_offset;
-    MPI_Scatter(rank_sizes.data(),1,mpi_data<uint64_t>::type, &my_offset, 1, mpi_data<uint64_t>::type, 0 ,MPI_COMM_WORLD);
-    std::cout << "rank " << world_rank << " with offset " << my_offset << "\n";
-
-    MPI_File of;
-    MPI_File_open(MPI_COMM_WORLD, (dir / "thread_major_sparse.db").c_str(),
-                  MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &of);
-    
-
-
-
-    #pragma omp parallel shared(ouputs) 
-    {
-      #pragma omp for 
-      for(const auto& tp: outputs.citerate()){
-      
-        int tid = tp.first->attributes.threadid();
-        std::vector<std::pair<uint32_t, uint64_t>>::iterator it = std::find_if (prof_offsets.begin(), prof_offsets.end(),\
-          [&profile_sizes](const std::pair<uint32_t, uint64_t>& element){ return element.first == tid;} );
-        MPI_Offset prof_offset = my_offset + it->second;
-        std::vector<std::pair<uint32_t, uint64_t>>::iterator it1 = std::find_if (profile_sizes.begin(), profile_sizes.end(),\
-          [&profile_sizes](const std::pair<uint32_t, uint64_t>& e){ return e.first == tid;} );
-        int count = it1->second;
-
-        std::ifstream input(tp.second.string().c_str(), std::ios::binary);
-        std::vector<char> bytes(
-         (std::istreambuf_iterator<char>(input)),
-         (std::istreambuf_iterator<char>()));
-        input.close();
-
-        MPI_Status stat;
-        MPI_File_write_at(of, prof_offset, &bytes,
-                      count, MPI_Byte,&stat);    
-      }
-    }
-    MPI_File_close(&of);
-
-
     // Gather the data from all the workers, build a big attributes table
     std::vector<std::pair<ThreadAttributes, stdshim::filesystem::path>> woutputs;
     {
@@ -591,13 +368,11 @@ void SparseDB::merge(int threads) {
     }
 
     // Copy our bits in too.
-    printf("For outputs, size is : %d\n", outputs.size());
     for(const auto& tp: outputs.citerate()){
       auto& attr = tp.first->attributes;
-       printf("I am rank %d (should be 0), I have tid: %d, r: %d\n", world_rank,attr.has_threadid() ? attr.threadid() : 0,attr.has_mpirank() ? attr.mpirank() : 0);
        woutputs.emplace_back(tp.first->attributes, tp.second);
     }
-/*
+
     // Open up the output file. We use MPI's I/O substrate to make sure things
     // work in the end. Probably.
     MPI_File of;
@@ -611,12 +386,11 @@ void SparseDB::merge(int threads) {
     merge0(threads, of, woutputs);
 
     // Close up and clean up
-    MPI_File_close(&of);*/
+    MPI_File_close(&of);
     /* for(const auto& tp: woutputs) */
     /*   stdshim::filesystem::remove(tp.second); */
   }
 }
-
 #endif
 
 //multi-thread

@@ -233,13 +233,16 @@ void Hpcrun4::read(const DataClass& needed) {
       int mid;
       hpcrun_metricVal_t val;
       if(sink.limit().hasContexts()) {
+        int mid = hpcrun_sparse_next_entry(file, &val);
+        if(mid == 0) continue;
         auto it = nodes.find(cid);
         if(it == nodes.end())
           util::log::fatal() << "Erroneous CCT id " << cid << " in " << path.string() << "!";
         auto& here = *it->second;
-        while((mid = hpcrun_sparse_next_entry(file, &val)) > 0) {
+        while(mid > 0) {
           auto v = metricInt.at(mid) ? (double)val.i : val.r;
           sink.add(here, *thread, metrics.at(mid), v);
+          mid = hpcrun_sparse_next_entry(file, &val);
         }
       } else {
         while((mid = hpcrun_sparse_next_entry(file, &val)) > 0) {

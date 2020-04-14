@@ -126,6 +126,7 @@ typedef struct hpcrun_sparse_file {
   size_t metric_pos_offset;
   size_t cct_offset_offset;
   size_t val_offset;
+  uint32_t num_nz_cct;
 
 } hpcrun_sparse_file_t;
 

@@ -994,25 +994,24 @@ int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_n
 /* succeed: returns a cct ID that we can read next_entry for; end of list: returns 0; error: returns -1 */
 int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
 {
-  if(sparse_fs->cur_block == sparse_fs->footer[2]) return 0; //no more cct block
   if(sparse_fs->cur_block == 0){
     fseek(sparse_fs->file,(sparse_fs->footer[5]+4),SEEK_SET);
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->num_nzval),sparse_fs->file));
+    fseek(sparse_fs->file,(sparse_fs->footer[5]+12+10*(sparse_fs->num_nzval)),SEEK_SET);
+    HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(sparse_fs->num_nz_cct),sparse_fs->file));
     sparse_fs->val_offset = sparse_fs->footer[5]+ 12;
     sparse_fs->metric_pos_offset = sparse_fs->val_offset + 8*(sparse_fs->num_nzval);
-    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + 2*(sparse_fs->num_nzval) +8; //change 10 to 2 for m_offset removal
+    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + 2*(sparse_fs->num_nzval) +4; //change 10 to 2 for m_offset removal
   }
-
-  //get the cct id for the context we are going to read
-  size_t find_cct_id = sparse_fs->footer[3] + 8 + 18*sparse_fs->cur_block;
-  fseek(sparse_fs->file,find_cct_id,SEEK_SET);
-  int id;
-  HPCFMT_ThrowIfError(hpcfmt_int4_fread(&id,sparse_fs->file));
+  if(sparse_fs->cur_block == sparse_fs->num_nz_cct) return 0; //no more cct block
 
   //seek to the first metric_position(id:offset) related to this cct
-  fseek(sparse_fs->file,(sparse_fs->cct_offset_offset + 8*sparse_fs->cur_block),SEEK_SET);
+  fseek(sparse_fs->file,(sparse_fs->cct_offset_offset + 12*sparse_fs->cur_block),SEEK_SET);
   size_t metric_block_pos;
+  int id;
+  HPCFMT_ThrowIfError(hpcfmt_int4_fread(&id,sparse_fs->file));
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&metric_block_pos,sparse_fs->file));
+  fseek(sparse_fs->file,4,SEEK_CUR);
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->cur_block_end),sparse_fs->file));
   if(metric_block_pos == sparse_fs->num_nzval) return 0; //might not be end of cct, but rest blocks are all empty
   fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + 2*metric_block_pos),SEEK_SET); //change 10 to 2 for m_offset removal

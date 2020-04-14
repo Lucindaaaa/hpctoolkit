@@ -163,12 +163,13 @@ Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
 
   try {
     FILE* fs = hpcio_fopen_r(filenm);
+    FILE* ofs = hpcio_fopen_w("readable_thread_major_sparse.db",1);
     if (!fs) {
       DIAG_Throw("error opening thread sparse file '" << filenm << "'");
     }
     uint32_t num_prof;
     uint64_t* x = tms_thread_offset_fread(&num_prof,fs);
-    tms_thread_offset_fprint(num_prof,x,stdout);
+    tms_thread_offset_fprint(num_prof,x,ofs);
 
     for(int i = 0; i<num_prof; i++){
       hpcrun_fmt_sparse_metrics_t sm;
@@ -176,10 +177,11 @@ Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
       if (ret != HPCFMT_OK) {
         DIAG_Throw("error reading thread sparse file '" << filenm << "'");
       }
-      hpcrun_fmt_sparse_metrics_fprint(&sm,stdout,NULL, "  ");
+      hpcrun_fmt_sparse_metrics_fprint(&sm,ofs,NULL, "  ");
     }
     
     hpcio_fclose(fs);
+    hpcio_fclose(ofs);
   }
   catch (...) {
     DIAG_EMsg("While reading '" << filenm << "'...");

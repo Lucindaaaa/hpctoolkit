@@ -214,13 +214,13 @@ void SparseDB::merge(int threads) {
     exscan(rank_sizes);
     MPI_Scatter(rank_sizes.data(),1,mpi_data<uint64_t>::type, &my_offset, 1, mpi_data<uint64_t>::type, 0 ,MPI_COMM_WORLD);  
 
+
     //gather number of profiles 
     uint32_t my_num_prof = prof_offsets.size();
     std::vector<uint32_t> rank_num_prof (world_size);
     MPI_Gather(&my_num_prof,1, mpi_data<uint32_t>::type,rank_num_prof.data(),1,mpi_data<uint32_t>::type,0,MPI_COMM_WORLD);
     for(auto np : rank_num_prof) total_num_prof += np;
     MPI_Bcast(&total_num_prof, 1, mpi_data<uint32_t>::type, 0, MPI_COMM_WORLD);
-    std::cout << "my_num_prof: " << my_num_prof << "; total: " << total_num_prof << ". \n";
 
     //gather offsets from all workers
     std::vector<uint64_t> all_prof_offsets (total_num_prof);
@@ -228,16 +228,20 @@ void SparseDB::merge(int threads) {
       auto og = Gather<uint64_t>::gather0(8);
       auto tg = Gather<uint32_t>::gather0(9);
       for(auto p = 1; p < tg.size(); p++) {
-        uint64_t offset = og[p].at(0);
-        uint32_t tid = tg[p].at(0);
-        all_prof_offsets.at(tid) = offset + (total_num_prof * 8) + 4; //4bytes for number of threads/profiles, 8bytes each for each offset
+        auto& o = og[p];
+        auto& t = tg[p];
+        for(auto i = 0; i < t.size(); i++){
+          all_prof_offsets.at(t.at(i)) = o.at(i)+ (total_num_prof * 8) + 4; //4bytes for number of threads/profiles, 8bytes each for each offset
+        }
       }
     }
     //rank 0's offsets
     for(auto i = 0; i<prof_offsets.size();i++){
       all_prof_offsets.at(prof_offsets.at(i).first) = prof_offsets.at(i).second+my_offset + (total_num_prof * 8) + 4;
     }
-    for(auto a: all_prof_offsets) std::cout << " " << a;
+    for(int i = 0; i<all_prof_offsets.size();i++){
+      std::cout << i << ":" << all_prof_offsets.at(i) << "\n";
+    }
     std::cout << "\n" ;
 
     FILE* fs = fopen((dir / "thread_major_sparse.db").c_str(),"w+");
@@ -248,7 +252,7 @@ void SparseDB::merge(int threads) {
     //sizes
     MPI_Gather(&my_size,1, mpi_data<uint64_t>::type,NULL,1,mpi_data<uint64_t>::type,0,MPI_COMM_WORLD);
     MPI_Scatter(NULL,1,mpi_data<uint64_t>::type, &my_offset, 1, mpi_data<uint64_t>::type, 0 ,MPI_COMM_WORLD);  
-    
+
     //number of profiles
     uint32_t my_num_prof = prof_offsets.size();
     MPI_Gather(&my_num_prof,1, mpi_data<uint32_t>::type,NULL,1,mpi_data<uint32_t>::type,0,MPI_COMM_WORLD);

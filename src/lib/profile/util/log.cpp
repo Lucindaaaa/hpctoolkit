@@ -61,7 +61,7 @@ fatal::fatal() { (*this) << "FATAL: "; }
 fatal::~fatal() {
   (*this) << '\n';
   std::cerr << sbuf.str();
-  std::exit(1);
+  std::abort();
 }
 
 error::error() { (*this) << "ERROR: "; }

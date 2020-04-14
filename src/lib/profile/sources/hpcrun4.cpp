@@ -212,7 +212,10 @@ void Hpcrun4::read(const DataClass& needed) {
       // Figure out the Scope for this node, if it has one.
       Scope scope;  // Default to the unknown Scope.
       if(n.lm_id != 0) {
-        scope = {modules.at(n.lm_id), n.lm_ip};
+        auto it = modules.find(n.lm_id);
+        if(it == modules.end())
+          util::log::fatal() << "Erroneous module id " << n.lm_id << " in " << path.string() << "!";
+        scope = {it->second, n.lm_ip};
       } else if(par == nullptr) {
         // Special case: merge global -> unknown to the global unknown.
         unknown_node_id = id;
@@ -230,7 +233,10 @@ void Hpcrun4::read(const DataClass& needed) {
       int mid;
       hpcrun_metricVal_t val;
       if(sink.limit().hasContexts()) {
-        auto& here = *nodes.at(cid);
+        auto it = nodes.find(cid);
+        if(it == nodes.end())
+          util::log::fatal() << "Erroneous CCT id " << cid << " in " << path.string() << "!";
+        auto& here = *it->second;
         while((mid = hpcrun_sparse_next_entry(file, &val)) > 0) {
           auto v = metricInt.at(mid) ? (double)val.i : val.r;
           sink.add(here, *thread, metrics.at(mid), v);

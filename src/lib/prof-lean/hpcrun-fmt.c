@@ -775,10 +775,12 @@ hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
     //HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->m_offset[i], fs));
   }
 
-  HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->num_cct), fs));
-  x->cct_offsets = (uint64_t *) malloc(((x->num_cct)+1)*sizeof(uint64_t));
-  for (int i = 0; i <= x->num_cct; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->cct_offsets[i], fs));
+  HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(x->num_nz_cct), fs));
+  x->cct_id = (uint32_t *) malloc((x->num_nz_cct)*sizeof(uint32_t));
+  x->cct_off = (uint64_t *) malloc((x->num_nz_cct)*sizeof(uint64_t));
+  for (int i = 0; i < x->num_nz_cct; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int4_fread(&x->cct_id[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->cct_off[i], fs));
   }
 
   return HPCFMT_OK;
@@ -803,13 +805,11 @@ hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x,FILE* fs)
     
   }
 
-  HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->num_cct, fs));
+  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->num_nz_cct, fs));
 
-  for (int i = 0; i <= x->num_cct; ++i) {
-    //uint64_t cct_off = x->cct_offsets[i+1] - x->cct_offsets[i]; 
-    //if(cct_off != 0){
-    //  HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->cct_offsets[i], fs));
-    //}
+  for (int i = 0; i < x->num_nz_cct; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->cct_id[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->cct_off[i], fs));
   }
 
   return HPCFMT_OK;
@@ -821,8 +821,8 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
           const metric_tbl_t* metricTbl, const char* pre)
 {
   fprintf(fs, "[sparse metrics:\n");
-  fprintf(fs, "%s(thread ID: %d)\n%s(number of non-zero metrics: %d)\n%s(number of cct nodes: %d)\n",
-	  pre, (int)x->tid,pre, (int)x->num_vals, pre,(int)x->num_cct);
+  fprintf(fs, "%s(thread ID: %d)\n%s(number of non-zero metrics: %d)\n",
+	  pre, (int)x->tid,pre, (int)x->num_vals);
 
   fprintf(fs, "%s(values: ", pre);
   for (uint i = 0; i < x->num_vals; ++i) {
@@ -861,10 +861,10 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
   }
   fprintf(fs, ")\n");
 
-  fprintf(fs,"%s(cct offsets: ",pre);
-  for (uint i = 0; i <= x->num_cct; i++) {
-    fprintf(fs, "%d", x->cct_offsets[i]);
-    if (i + 1 < x->num_cct+1) {
+  fprintf(fs,"%s(cct offsets (cct id : offset): ",pre);
+  for (uint i = 0; i < x->num_nz_cct; i++) {
+    fprintf(fs, "%d:%d", x->cct_id[i], x->cct_off[i]);
+    if (i + 1 < x->num_nz_cct) {
       fprintf(fs, " ");
     }
   }

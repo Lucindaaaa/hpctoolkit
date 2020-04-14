@@ -145,7 +145,7 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
   sm.values = values.data();
   sm.mid = mids.data();
   sm.m_offset = moffsets.data();
-  sm.cct_offsets = coffsets.data();
+  //sm.cct_offsets = coffsets.data(); //YUMENG: comment out in order to compile
 
   // Set up the output temporary file.
   stdshim::filesystem::path outfile;

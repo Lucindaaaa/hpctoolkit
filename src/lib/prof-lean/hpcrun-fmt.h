@@ -609,8 +609,11 @@ struct hpcrun_fmt_sparse_metrics_t{
   hpcrun_metricVal_t* values;
   uint16_t* mid;
   uint64_t* m_offset;
-  //metric_position_t* metric_pos;
-  uint64_t *cct_offsets;
+
+  //cct_id : cct_off pair
+  uint32_t *cct_id;
+  uint64_t *cct_off;
+  uint32_t num_nz_cct;
 };
 
 typedef struct hpcrun_fmt_sparse_metrics_t hpcrun_fmt_sparse_metrics_t;

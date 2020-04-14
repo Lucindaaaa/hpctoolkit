@@ -1045,6 +1045,44 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
   return id;
 }
 
+
+//***************************************************************************
+// thread_major_sparse.db helper - YUMENG
+//***************************************************************************
+int
+tms_thread_offset_fwrite(uint32_t num_t,uint64_t* x, FILE* fs)
+{
+  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite(num_t, fs));
+
+  for (int i = 0; i < num_t; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x[i], fs));
+  }
+  return HPCFMT_OK;
+}
+
+uint64_t* 
+tms_thread_offset_fread(uint32_t* num_t,FILE* fs)
+{
+  HPCFMT_ThrowIfError(hpcfmt_int4_fread(num_t, fs));
+
+  uint64_t* x = (uint64_t *) malloc((*num_t)*sizeof(uint64_t));
+  for (int i = 0; i < *num_t; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x[i], fs));
+  }
+  return x;
+}
+
+void
+tms_thread_offset_fprint(uint32_t num_t,uint64_t* x, FILE* fs)
+{
+  fprintf(fs,"[Threads offsets (thread id : offset)\n  (");
+  for (int i = 0; i < num_t; ++i) {
+    fprintf(fs,"%d:%d ",i,x[i]);
+  }
+  fprintf(fs,")\n]\n");
+  return HPCFMT_OK;
+}
+
 //***************************************************************************
 
 int

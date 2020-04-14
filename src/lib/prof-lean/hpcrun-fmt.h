@@ -647,6 +647,13 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
 
 
 // --------------------------------------------------------------------------
+// thread_major_sparse.db helper
+// --------------------------------------------------------------------------
+int tms_thread_offset_fwrite(uint32_t num_t,uint64_t* x, FILE* fs);
+uint64_t* tms_thread_offset_fread(uint32_t* num_t,FILE* fs);
+void tms_thread_offset_fprint(uint32_t num_t,uint64_t* x, FILE* fs);
+
+// --------------------------------------------------------------------------
 //
 // --------------------------------------------------------------------------
 

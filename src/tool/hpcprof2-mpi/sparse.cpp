@@ -109,39 +109,47 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
   // Allocate the blobs needed for the final output
   std::vector<hpcrun_metricVal_t> values;
   std::vector<uint16_t> mids;
+  std::vector<uint32_t> cids;
   std::vector<uint64_t> coffsets;
   coffsets.reserve(1 + (ctxMaxId+1)*2 + 1);  // To match up with EXML ids.
 
   // Now stitch together each Context's results
   for(const Context& c: contexts) {
-    auto id = c.userdata[src.identifier()]*2 + 1;  // Convert to EXML id
-    coffsets.resize(id+1, values.size());
+    bool any = false;
+    std::size_t offset = values.size();
     for(const Metric& m: metrics) {
       const auto& ids = m.userdata[src.identifier()];
       auto vv = m.getFor(tt, c);
       hpcrun_metricVal_t v;
       if(vv.first != 0) {
         v.r = vv.first;
+        any = true;
         mids.push_back(ids.first);
         values.push_back(v);
       }
       if(vv.second != 0) {
         v.r = vv.second;
+        any = true;
         mids.push_back(ids.second);
         values.push_back(v);
       }
     }
+    if(any) {
+      cids.push_back(c.userdata[src.identifier()]*2 + 1);  // Convert to EXML id
+      coffsets.push_back(offset);
+    }
   }
-  coffsets.push_back(values.size());  // One extra for ranges
 
   // Put together the sparse_metrics structure
   hpcrun_fmt_sparse_metrics_t sm;
   sm.tid = t.attributes.has_threadid() ? t.attributes.threadid() : 0;
   sm.num_vals = values.size();
-  sm.num_cct = coffsets.size()-1;
+  sm.num_cct = contexts.size();
+  sm.num_nz_cct = coffsets.size();
   sm.values = values.data();
   sm.mid = mids.data();
-  //sm.cct_offsets = coffsets.data(); //YUMENG: comment out in order to compile
+  sm.cct_id = cids.data();
+  sm.cct_off = coffsets.data();
 
   // Set up the output temporary file.
   stdshim::filesystem::path outfile;

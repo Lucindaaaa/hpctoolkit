@@ -405,7 +405,6 @@ void SparseDB::exscan(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>
 
   #pragma omp parallel shared(result,data,n)
   {
-    std::cout << "num of threads in exscan: " << omp_get_num_threads() << "\n";
     int p = omp_get_num_threads();
     int block = n/(p+1);
 

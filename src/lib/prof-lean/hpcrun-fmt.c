@@ -1013,6 +1013,7 @@ int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&metric_block_pos,sparse_fs->file));
   fseek(sparse_fs->file,4,SEEK_CUR);
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->cur_block_end),sparse_fs->file));
+  if(sparse_fs->cur_block == sparse_fs->num_nz_cct - 1) sparse_fs->cur_block_end = sparse_fs->num_nzval;
   if(metric_block_pos == sparse_fs->num_nzval) return 0; //might not be end of cct, but rest blocks are all empty
   fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + 2*metric_block_pos),SEEK_SET); //change 10 to 2 for m_offset removal
   sparse_fs->cur_block++;

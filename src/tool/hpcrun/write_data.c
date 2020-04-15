@@ -366,7 +366,10 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
     hpcrun_sparse_metrics.values = sparse_metrics.values;
     hpcrun_sparse_metrics.mid = (uint16_t *) hpcrun_malloc(sparse_metrics.num_vals * sizeof(uint16_t));
     hpcrun_sparse_metrics.m_offset = (uint64_t *) hpcrun_malloc(sparse_metrics.num_vals * sizeof(uint64_t));
-    hpcrun_sparse_metrics.cct_offsets = sparse_metrics.cct_offsets;
+    //hpcrun_sparse_metrics.cct_offsets = sparse_metrics.cct_offsets;
+    hpcrun_sparse_metrics.cct_id = sparse_metrics.cct_id;
+    hpcrun_sparse_metrics.cct_off = sparse_metrics.cct_off;
+    hpcrun_sparse_metrics.num_nz_cct = sparse_metrics.num_nz_cct;
     for(int i = 0; i<sparse_metrics.num_vals; i++){
       hpcrun_sparse_metrics.mid[i] = sparse_metrics.metric_pos[i].mid;
       hpcrun_sparse_metrics.m_offset[i] = sparse_metrics.metric_pos[i].offset;

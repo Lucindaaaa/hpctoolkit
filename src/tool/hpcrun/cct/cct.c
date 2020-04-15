@@ -418,6 +418,11 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
   size_t curr_num_cct = sparse_metrics->num_cct;
   uint64_t curr_cct_offset = (sparse_metrics->cct_offsets)[curr_num_cct];
   uint64_t num_nzval = hpcrun_metric_set_sparse_copy(sparse_metrics->values,sparse_metrics->metric_pos, data_list,curr_cct_offset);
+  if(num_nzval != 0){
+    (sparse_metrics->cct_id)[sparse_metrics->num_nz_cct] = tmp->id;
+    (sparse_metrics->cct_off)[sparse_metrics->num_nz_cct] = curr_cct_offset;
+    (sparse_metrics->num_nz_cct)++;
+  }
   (sparse_metrics->cct_offsets)[curr_num_cct + 1] = curr_cct_offset + num_nzval;
   (sparse_metrics->num_cct)++;
   tmp->num_metrics = 0;
@@ -831,6 +836,10 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
   //YUMENG: initialize cct_offsets, last offset will be the total number of values
   sparse_metrics->cct_offsets = (uint64_t *) hpcrun_malloc((nodes+1)*sizeof(uint64_t));
   (sparse_metrics->cct_offsets)[0] = 0;
+  //YUMENG:temp code to record cct_id:cct_off pair
+  sparse_metrics->cct_off = (uint64_t *) hpcrun_malloc((nodes)*sizeof(uint64_t));
+  sparse_metrics->cct_id = (uint32_t *) hpcrun_malloc((nodes)*sizeof(uint32_t));
+  sparse_metrics->num_nz_cct = 0;
 
   hpcfmt_int8_fwrite((uint64_t) nodes, fs);
   TMSG(DATA_WRITE, "num cct nodes = %d", nodes);

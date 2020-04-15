@@ -48,6 +48,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include<cmath>
+#include <omp.h>
+
 #include <sstream>
 
 using namespace hpctoolkit;
@@ -56,7 +59,7 @@ using namespace hpctoolkit;
 // argument with all the bits.
 void SparseDB::merge0(int threads, MPI_File& outfile, const std::vector<std::pair<ThreadAttributes,
     stdshim::filesystem::path>>& inputs) {
-
+      
   // At the moment, all we do is write out a series of lines about what files
   // would have been read in and such.
   // Since MPI makes this complicated, we stash in a stringstream and then WRITE.
@@ -66,6 +69,17 @@ void SparseDB::merge0(int threads, MPI_File& outfile, const std::vector<std::pai
     //ss << "Thread [" << attr.mpirank() << "," << attr.threadid() << "] "
     //   << "written in " << in.second.string() << "\n";
 
+    /*
+    omp_set_num_threads(threads);
+    #pragma omp parallel
+    {
+       int num = omp_get_num_threads();
+      int tid = omp_get_thread_num();
+      printf("I am %d thread in %d\n", tid, num);
+    }
+    */
+
+ 
     //YUMENG
     struct stat buf;
     stat(in.second.string().c_str(),&buf);
@@ -81,6 +95,9 @@ void SparseDB::merge0(int threads, MPI_File& outfile, const std::vector<std::pai
 
 // Merge function, only called on rank >0.
 void SparseDB::mergeN(int threads, MPI_File& outfile) {
-  // At the moment, the workers don't do anything. Everything is handled via
-  // the master rank 0.
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+  std::vector<std::pair<ThreadAttributes, stdshim::filesystem::path>> my_inputs;
+  
 }

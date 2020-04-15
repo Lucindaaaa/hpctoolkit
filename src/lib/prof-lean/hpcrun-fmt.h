@@ -126,6 +126,7 @@ typedef struct hpcrun_sparse_file {
   size_t metric_pos_offset;
   size_t cct_offset_offset;
   size_t val_offset;
+  uint32_t num_nz_cct;
 
 } hpcrun_sparse_file_t;
 
@@ -609,8 +610,11 @@ struct hpcrun_fmt_sparse_metrics_t{
   hpcrun_metricVal_t* values;
   uint16_t* mid;
   uint64_t* m_offset;
-  //metric_position_t* metric_pos;
-  uint64_t *cct_offsets;
+
+  //cct_id : cct_off pair
+  uint32_t *cct_id;
+  uint64_t *cct_off;
+  uint32_t num_nz_cct;
 };
 
 typedef struct hpcrun_fmt_sparse_metrics_t hpcrun_fmt_sparse_metrics_t;
@@ -645,6 +649,13 @@ int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_n
 int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs);
 int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t* val);
 
+
+// --------------------------------------------------------------------------
+// thread_major_sparse.db helper
+// --------------------------------------------------------------------------
+int tms_thread_offset_fwrite(uint32_t num_t,uint64_t* x, FILE* fs);
+uint64_t* tms_thread_offset_fread(uint32_t* num_t,FILE* fs);
+void tms_thread_offset_fprint(uint32_t num_t,uint64_t* x, FILE* fs);
 
 // --------------------------------------------------------------------------
 //

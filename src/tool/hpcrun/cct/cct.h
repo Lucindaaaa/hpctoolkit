@@ -128,6 +128,11 @@ struct sparse_metrics_t{
   cct_metric_data_t* values;
   metric_position_t* metric_pos;
   uint64_t *cct_offsets;
+  
+  //to get (cct id: cct_offset) pair, need to clean the design a little bit afterwards
+  uint32_t *cct_id;
+  uint64_t *cct_off;
+  uint32_t num_nz_cct;
 };
 
 typedef struct sparse_metrics_t sparse_metrics_t;

@@ -80,9 +80,16 @@ public:
 
   void notifyWavefront(hpctoolkit::DataClass::singleton_t) noexcept override;
   void notifyThreadFinal(const hpctoolkit::Thread::Temporary&) override;
+
+  //YUMENG
+  uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
+  uint32_t getTotalNumProfiles(uint32_t my_num_prof);
+  uint64_t getMyOffset(uint64_t my_size,int rank);
+  void getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
+      std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
+      uint32_t total_prof, uint64_t my_offset, int threads);
   void merge(int);
-  void exscan(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& data, std::vector<std::pair<uint32_t, uint64_t>>& re); //YUMENG
-  void exscan(std::vector<uint64_t>& data); //YUMENG
+  void exscan(std::vector<uint64_t>& data,int threads); 
 
 private:
   hpctoolkit::stdshim::filesystem::path dir;

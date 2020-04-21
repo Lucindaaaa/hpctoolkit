@@ -176,7 +176,50 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
 void SparseDB::write() {};
 
 //YUMENG
-void SparseDB::merge(int threads) {
+uint64_t SparseDB::getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes){
+  uint64_t my_size = 0;
+  for(const auto& tp: outputs.citerate()) {
+    struct stat buf;
+    stat(tp.second.string().c_str(),&buf);
+    my_size += buf.st_size;
+    profile_sizes.emplace_back(tp.first,buf.st_size);    
+  }
+  return my_size;
+}
+
+uint32_t SparseDB::getTotalNumProfiles(uint32_t my_num_prof){
+  uint32_t total_num_prof;
+  MPI_Allreduce(&my_num_prof, &total_num_prof, 1, mpi_data<uint32_t>::type, MPI_SUM, MPI_COMM_WORLD);
+  return total_num_prof;
+}
+
+uint64_t SparseDB::getMyOffset(uint64_t my_size,int rank){
+    uint64_t my_offset;
+    MPI_Exscan(&my_size, &my_offset, 1, mpi_data<uint64_t>::type, MPI_SUM, MPI_COMM_WORLD);
+    if(rank == 0) my_offset = 0;
+    return my_offset;
+}
+
+void SparseDB::getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
+    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
+    uint32_t total_prof, uint64_t my_offset, int threads)
+{
+  std::vector<uint64_t> tmp (profile_sizes.size());
+  #pragma omp parallel for num_threads(threads)
+  for(int i = 0; i<tmp.size();i++){
+    tmp[i] = profile_sizes[i].second;
+  }
+
+  exscan(tmp,threads);
+
+  #pragma omp parallel for num_threads(threads)
+  for(int i = 0; i<tmp.size();i++){
+    prof_offsets[i].first = profile_sizes[i].first->attributes.threadid();
+    prof_offsets[i].second = tmp[i] + my_offset + (total_prof*8) + 4; //4 bytes for number of threads/profile, 8 bytes each for each offset
+  }
+}
+
+/*void SparseDB::merge(int threads) {
   //
   //profile_sizes: vector of (thread id : its own size)
   //prof_offsets: vector of (thread id: local offset relative to its own file)
@@ -192,23 +235,32 @@ void SparseDB::merge(int threads) {
 
   //calculate size of my porfiles
   std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>> profile_sizes;
-  uint64_t my_size = 0;
+  uint64_t my_size = getProfileSizes(profile_sizes);
+  std::cout << "Rank " << world_rank << "with size " << my_size \
+            << "; Num of profiles: " << profile_sizes.size() << "\n";
+  for(auto p:profile_sizes){
+    std::cout << p.first->attributes.threadid << " : " << p.second << "\n";
+  }
+
   for(const auto& tp: outputs.citerate()) {
     struct stat buf;
     stat(tp.second.string().c_str(),&buf);
     my_size += buf.st_size;
     profile_sizes.emplace_back(tp.first,buf.st_size);    
   }
+*/
 
+/*
   //local exscan to get local offsets
   std::vector<std::pair<uint32_t, uint64_t>> prof_offsets (profile_sizes.size());
-  omp_set_num_threads(threads/world_size);
-  exscan(profile_sizes,prof_offsets);
+  int num_threads = std::min(threads/world_size,(int)profile_sizes.size()/2-1);
+  if(profile_sizes.size()>0) exscan(profile_sizes,prof_offsets,num_threads);
 
   //get global offsets, write thread offsets array
   //my_offset + local offsets + bytes needed for thread offsets array = place to write this profile
   uint64_t my_offset;
   uint32_t total_num_prof = 0;
+
   if(world_rank == 0){
     std::vector<uint64_t> rank_sizes (world_size);
     //gather sizes from all workers, scatter/get local offset
@@ -308,16 +360,37 @@ void SparseDB::merge(int threads) {
  
   MPI_File_close(&thread_major_f);
 
-}
+}*/
 
 
-#if 0
+#if 1
 //Jonathon's original code
 void SparseDB::merge(int threads) {
   int world_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   int world_size;
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+  //calculate size of my porfiles YUMENG
+  std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>> profile_sizes;
+  uint64_t my_size = getProfileSizes(profile_sizes);
+  std::cout << "Rank " << world_rank << "with size " << my_size \
+            << "; Num of profiles: " << profile_sizes.size() << "\n";
+  for(auto p:profile_sizes){
+    std::cout << p.first->attributes.threadid() << " : " << p.second << "; ";
+  }
+  std::cout << "\n";
+
+  uint32_t total_prof = getTotalNumProfiles(profile_sizes.size());
+  uint64_t my_off = getMyOffset(my_size,world_rank);
+
+  std::vector<std::pair<uint32_t, uint64_t>> prof_offsets (profile_sizes.size());
+  getMyProfOffset(prof_offsets,profile_sizes,total_prof, my_off, threads/world_size);
+  for(auto p:prof_offsets) std::cout << p.first <<":"<< p.second << ";  ";
+  std::cout << "\n";
+  
+
+
 
   if(world_rank != 0) {  
     // Tell rank 0 all about our data
@@ -398,77 +471,23 @@ void SparseDB::merge(int threads) {
 #endif
 
 //YUMENG
-//multi-thread
-void SparseDB::exscan(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& data,std::vector<std::pair<uint32_t, uint64_t>>& re) {
+void SparseDB::exscan(std::vector<uint64_t>& data, int threads) {
   int n = data.size();
-  std::vector<uint64_t> result (n);
+  int rounds = ceil(std::log2(n));
+  std::vector<uint64_t> tmp (n);
 
-  #pragma omp parallel shared(result,data,n)
-  {
-    int p = omp_get_num_threads();
-    int block = n/(p+1);
-
-    int tid = omp_get_thread_num();
-    int sum = 0;
-    for(int i = tid*block; i<(tid+1)*block;i++){
-      result.at(i) = data.at(i).second + sum;
-      sum = result.at(i);
+  for(int i = 0; i<rounds; i++){
+    #pragma omp parallel for num_threads(threads)
+    for(int j = 0; j < n; j++){
+      int p = (int)pow(2.0,i);
+      tmp.at(j) = (j<p) ?  data.at(j) : data.at(j)+data.at(j-p);
     }
-
-    #pragma omp barrier   
-    #pragma omp master 
-    { 
-      int offset = 0;
-      for(int i = 1; i <= p; i++){
-        offset += result.at(i*block - 1);
-        result.at(i*block) = offset; 
-      }
-    }
-
-    #pragma omp barrier
-    int my_offset = result.at((tid+1)*block);
-    for(int i = (tid+1)*block; i <= (tid+2)*block - 1; i++){
-      result.at(i) = data.at(i).second + my_offset;
-      my_offset = result.at(i);
-    }
-
-    #pragma omp barrier
-    if(n > (p+1)*block ){
-      #pragma omp master
-      {
-        my_offset = result.at((p+1)*block - 1);
-        for(int i = (p+1)*block; i<n; i++){
-          result.at(i) = data.at(i).second + my_offset;
-          my_offset = result.at(i);
-        }
-      }    
-    }
-
-    #pragma omp barrier
-    re.at(0).second = 0;
-    re.at(0).first = (uint32_t)data.at(0).first->attributes.threadid();
-    for(int i = 1; i<n;i++){
-      re.at(i).second = result.at(i-1);
-      re.at(i).first = (uint32_t) data.at(i).first->attributes.threadid();
-    }
+    if(i<rounds-1) data = tmp;
   }
 
-}
-
-//single thread, only for short singleton vector
-void SparseDB::exscan(std::vector<uint64_t>& data) {
-  int n = data.size();
-  std::vector<uint64_t> result (n);
-
-  int sum = 0;
-  for(int i = 0; i<n;i++){
-    result.at(i) = data.at(i) + sum;
-    sum = result.at(i);
+  data[0] = 0;
+  #pragma omp parallel for num_threads(threads)
+  for(int i = 1; i < n; i++){
+    data[i] = tmp[i-1];
   }
-
-  data.at(0) = 0;
-  for(int i = 1; i<n;i++){
-    data.at(i) = result.at(i-1);
-  }
-  
 }

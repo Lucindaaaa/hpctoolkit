@@ -175,7 +175,9 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
 
 void SparseDB::write() {};
 
-//YUMENG
+//***************************************************************************
+// thread_major_sparse.db  - YUMENG
+//***************************************************************************
 uint64_t SparseDB::getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes){
   uint64_t my_size = 0;
   for(const auto& tp: outputs.citerate()) {
@@ -407,7 +409,6 @@ void SparseDB::merge(int threads) {
 }
 #endif
 
-//YUMENG
 void SparseDB::exscan(std::vector<uint64_t>& data, int threads) {
   int n = data.size();
   int rounds = ceil(std::log2(n));

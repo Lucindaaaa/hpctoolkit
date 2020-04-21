@@ -98,6 +98,7 @@ public:
   void merge(int);
   void exscan(std::vector<uint64_t>& data,int threads); 
 
+
 private:
   hpctoolkit::stdshim::filesystem::path dir;
   void merge0(int, MPI_File&, const std::vector<std::pair<hpctoolkit::ThreadAttributes,

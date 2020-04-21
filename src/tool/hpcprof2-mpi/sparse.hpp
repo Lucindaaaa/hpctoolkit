@@ -88,6 +88,13 @@ public:
   void getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
       std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
       uint32_t total_prof, uint64_t my_offset, int threads);
+  void writeProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+      MPI_File fh, uint32_t total_prof, int rank, int threads);
+  void writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes, MPI_File fh, 
+    int threads);
+  void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
+  void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
   void merge(int);
   void exscan(std::vector<uint64_t>& data,int threads); 
 

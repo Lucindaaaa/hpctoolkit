@@ -1069,6 +1069,7 @@ tms_thread_offset_fread(uint32_t* num_t,FILE* fs)
   HPCFMT_ThrowIfError(hpcfmt_int4_fread(num_t, fs));
 
   uint64_t* x = (uint64_t *) malloc((*num_t)*sizeof(uint64_t));
+
   for (int i = 0; i < *num_t; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x[i], fs));
   }
@@ -1079,6 +1080,7 @@ void
 tms_thread_offset_fprint(uint32_t num_t,uint64_t* x, FILE* fs)
 {
   fprintf(fs,"[Threads offsets (thread id : offset)\n  (");
+
   for (int i = 0; i < num_t; ++i) {
     fprintf(fs,"%d:%d ",i,x[i]);
   }

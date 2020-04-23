@@ -95,6 +95,12 @@ public:
     int threads);
   void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
   void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
+  void writeThreadMajor(int threads, int world_rank, int world_size);
+
+  void getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_sizes,
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
+  void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
+    std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank);
   void merge(int);
   void exscan(std::vector<uint64_t>& data,int threads); 
 

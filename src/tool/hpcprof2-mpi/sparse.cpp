@@ -289,19 +289,13 @@ void SparseDB::writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_of
     
 }
 
-
-void SparseDB::merge(int threads) {
+void SparseDB::writeThreadMajor(int threads, int world_rank, int world_size){
   //
   // profile_sizes: vector of (thread attributes: its own size)
   // prof_offsets: vector of (thread id: final global offset)
   // my_size: the size of this rank's profiles total
   // total_prof: total number of profiles across ranks
   //
-
-  int world_rank;
-  int world_size;
-  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
   std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>> profile_sizes;
   uint64_t my_size = getProfileSizes(profile_sizes);
@@ -320,6 +314,96 @@ void SparseDB::merge(int threads) {
  
   MPI_File_close(&thread_major_f);
 
+}
+
+//***************************************************************************
+// cct_major_sparse.db  - YUMENG
+//***************************************************************************
+void vSum ( uint64_t *, uint64_t *, int *, MPI_Datatype * );
+ 
+void vSum(uint64_t *invec, uint64_t *inoutvec, int *len, MPI_Datatype *dtype)
+{
+    int i;
+    for ( i=0; i<*len; i++ )
+        inoutvec[i] += invec[i];
+}
+
+void SparseDB::getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_sizes,
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads)
+{
+  std::vector<uint64_t> tmp (cct_sizes.size());
+  #pragma omp parallel for num_threads(threads)
+  for(int i = 0; i<tmp.size();i++){
+    tmp[i] = cct_sizes[i].second;
+  }
+
+  exscan(tmp,threads); //get local offsets
+
+  //sum up local offsets to get global offsets
+  MPI_Op vectorSum;
+  MPI_Op_create((MPI_User_function *)vSum, 1, &vectorSum);
+  MPI_Allreduce(MPI_IN_PLACE, tmp.data(), tmp.size() ,mpi_data<uint64_t>::type, vectorSum, MPI_COMM_WORLD);
+
+  #pragma omp parallel for num_threads(threads)
+  for(int i = 0; i<tmp.size();i++){
+    cct_off[i].first = cct_sizes[i].first;
+    cct_off[i].second = tmp[i];
+  }
+
+}
+
+
+void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
+    std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank)
+{
+  MPI_Allreduce(MPI_IN_PLACE, &last_cct_size, 1 ,mpi_data<uint64_t>::type, MPI_SUM, MPI_COMM_WORLD);
+
+  uint64_t total_size = cct_off[cct_off.size()-1].second + last_cct_size;
+  uint64_t max_size_per_rank = round(total_size/num_ranks);
+  uint64_t my_start = rank*max_size_per_rank;
+  uint64_t my_end = (rank == num_ranks-1) ? total_size : (rank+1)*max_size_per_rank;
+  
+  if(rank == 0) my_ccts.emplace_back(0);
+  for(int i = 2; i<cct_off.size(); i++){
+    if(cct_off[i].second>my_start && cct_off[i].second <= my_end) my_ccts.emplace_back(cct_off[i-1].first);
+  }
+  if(rank == num_ranks-1) my_ccts.emplace_back(cct_off[cct_off.size()-1].first);
+
+  
+}
+
+
+
+
+
+void SparseDB::merge(int threads) {
+  int world_rank;
+  int world_size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+  writeThreadMajor(threads,world_rank,world_size);
+
+
+/*
+  std::vector<std::pair<uint32_t, uint64_t>> cct_sizes (30);
+  for(int i =0;i<30;i++){
+    cct_sizes[i].first = i;
+    cct_sizes[i].second = i*10;
+  }
+
+  std::vector<std::pair<uint32_t, uint64_t>> cct_off (cct_sizes.size());
+  std::vector<uint32_t> my_cct;
+  getCctOffset(cct_sizes,cct_off,threads/world_size);
+  for(auto c :cct_off) std::cout << " " << c.second;
+  std::cout << "\n\n";
+  getMyCCTs(cct_off,my_cct,cct_sizes[cct_sizes.size()-1].second,world_size, world_rank);
+  std::cout << "Rank " << world_rank << ": ";
+  for(auto c :my_cct) std::cout << " " << c;
+  std::cout << "\n\n";
+
+  std::cout << "size I am responsible for : " << (cct_off[my_cct[my_cct.size()-1]].second - cct_off[my_cct[0]].second + cct_sizes[my_cct[my_cct.size()-1]].second) <<"\n";
+*/
 }
 
 

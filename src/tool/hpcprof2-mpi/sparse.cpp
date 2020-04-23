@@ -349,9 +349,10 @@ void SparseDB::getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_size
     cct_off[i].first = cct_sizes[i].first;
     cct_off[i].second = tmp[i];
   }
+  
+  MPI_Op_free(&vectorSum);
 
 }
-
 
 void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
     std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank)
@@ -374,7 +375,9 @@ void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
 
 
 
-
+//***************************************************************************
+// general - YUMENG
+//***************************************************************************
 
 void SparseDB::merge(int threads) {
   int world_rank;
@@ -385,7 +388,7 @@ void SparseDB::merge(int threads) {
   writeThreadMajor(threads,world_rank,world_size);
 
 
-/*
+/* TEMP: test some cct major functions
   std::vector<std::pair<uint32_t, uint64_t>> cct_sizes (30);
   for(int i =0;i<30;i++){
     cct_sizes[i].first = i;

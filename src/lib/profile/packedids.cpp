@@ -109,7 +109,9 @@ Context& IdPacker::Classifier::context(Context& c, Scope& s) {
         shared.ctxtree.emplace_back(2);
         break;
       }
-      pack(shared.ctxtree, (std::uint64_t)ct.userdata[sink.identifier()]);
+      auto newid = ct.userdata[sink.identifier()];
+      pack(shared.ctxtree, (std::uint64_t)newid);
+      shared.ctxids.emplace(newid);
     }
     shared.ctxcnt += 1;
   }
@@ -127,7 +129,9 @@ void IdPacker::Sink::notifyWavefront(DataClass::singleton_t ds) {
   if(val == 0) {  // This is it!
     std::vector<uint8_t> ct;
     // Format: [global id] [mod cnt] (modules) [map cnt] (map entries...)
-    pack(ct, (std::uint64_t)src.contexts().userdata[src.identifier()]);
+    auto globalid = src.contexts().userdata[src.identifier()];
+    pack(ct, (std::uint64_t)globalid);
+    shared.ctxids.emplace(globalid);
 
     std::vector<std::string> mods;
     for(const Module& m: src.modules().iterate()) {
@@ -168,6 +172,7 @@ std::uint64_t unpack<std::uint64_t>(std::vector<uint8_t>::const_iterator& it) no
 IdUnpacker::IdUnpacker(std::vector<uint8_t>&& c) : ctxtree(std::move(c)) {
   auto it = ctxtree.cbegin();
   globalid = ::unpack<std::uint64_t>(it);
+  ctxids.emplace(globalid);
 }
 
 void IdUnpacker::Expander::unpack() {
@@ -202,6 +207,7 @@ void IdUnpacker::Expander::unpack() {
       auto ty = *it;
       it++;
       auto id = ::unpack<std::uint64_t>(it);
+      shared.ctxids.emplace(id);
       switch(ty) {
       case 0:  // unknown or point -> point
         scopes.emplace_back(*shared.exmod, id);

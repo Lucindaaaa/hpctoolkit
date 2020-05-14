@@ -896,7 +896,7 @@ hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path)
 
   //initialize footer
   fseek(fs, 0, SEEK_END);
-  size_t footer_position = ftell(fs) - 56;
+  size_t footer_position = ftell(fs) - SPARSE_FILE_FOOTER_SIZE;
   fseek(fs, footer_position, SEEK_SET);
   for(int i = 0; i<7; i++){
     if( hpcfmt_int8_fread(&(sparse_fs->footer[i]), fs) != HPCFMT_OK) {
@@ -924,14 +924,14 @@ int hpcrun_sparse_resume(hpcrun_sparse_file_t* sparse_fs, const char* path)
   if(sparse_fs->mode == OPENED){
     fprintf(stderr, "ERROR: the file descriptor in the hpcrun_sparse_file object is still open\n");
     //exit(-1); //maybe change to not exit directly?
-    return HPCFMT_ERR;
+    return SPARSE_FILE_ERR;
   }
   FILE* fs = hpcio_fopen_r(path);
-  if(!fs) return 1;
+  if(!fs) return SPARSE_FILE_FAIL;
   sparse_fs->file = fs;
   fseek(fs, sparse_fs->cur_pos, SEEK_SET);
   sparse_fs->mode = OPENED;
-  return 0;
+  return SPARSE_FILE_SUCCEED;
 }
 
 void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs)
@@ -945,8 +945,8 @@ int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hd
 {
   fseek(sparse_fs->file, sparse_fs->footer[0],SEEK_SET);
   int ret = hpcrun_fmt_hdr_fread(hdr, sparse_fs->file, malloc);
-  if(ret != HPCFMT_OK) return HPCFMT_ERR;
-  return 0;
+  if(ret != HPCFMT_OK) return SPARSE_FILE_ERR;
+  return SPARSE_FILE_SUCCEED;
 }
 
 /* succeed: returns positive id; End of list: returns 0; Fail reading: returns -1; */

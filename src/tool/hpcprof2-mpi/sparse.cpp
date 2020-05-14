@@ -328,6 +328,7 @@ void vSum(uint64_t *invec, uint64_t *inoutvec, int *len, MPI_Datatype *dtype)
         inoutvec[i] += invec[i];
 }
 
+//input: local sizes for all cct, output: final offsets for all cct
 void SparseDB::getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_sizes,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads)
 {
@@ -354,6 +355,7 @@ void SparseDB::getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_size
 
 }
 
+//input: final sizes for all cct, output: my(rank) own responsible cct list
 void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
     std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank)
 {
@@ -373,6 +375,214 @@ void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
   
 }
 
+/*TODO: 大概念: pre calc how many bytes in total, 
+read_at once, interpret; + open giant thread_major_file fseek
+根据cct offsets get val and mid
+merge after get all tid data pair for one cct
+*/
+
+void SparseDB::readAsByte4(uint32_t *val, MPI_File fh, MPI_Offset off){
+  uint32_t v = 0;
+  int shift = 0, num_reads = 0;
+  char input[4];
+
+  MPI_Status stat;
+  MPI_File_read_at(fh,off,&input,4,MPI_BYTE,&stat);
+  
+  for (shift = 24; shift >= 0; shift -= 8) {
+    v |= ((uint32_t)(input[num_reads] & 0xff) << shift); 
+    num_reads++;
+  }
+
+  *val = v;
+
+}
+
+void SparseDB::readAsByte8(uint64_t *val, MPI_File fh, MPI_Offset off){
+  uint32_t v = 0;
+  int shift = 0, num_reads = 0;
+  char input[8];
+
+  MPI_Status stat;
+  MPI_File_read_at(fh,off,&input,8,MPI_BYTE,&stat);
+  
+  for (shift = 56; shift >= 0; shift -= 8) {
+    v |= ((uint64_t)(input[num_reads] & 0xff) << shift); 
+    num_reads++;
+  }
+
+  *val = v;
+
+}
+
+void SparseDB::interpretByte2(uint16_t *val, char *input){
+  uint16_t v = 0;
+  int shift = 0, num_reads = 0;
+
+  for (shift = 8; shift >= 0; shift -= 8) {
+    v |= ((uint16_t)(input[num_reads] & 0xff) << shift); 
+    num_reads++;
+  }
+
+  *val = v;
+}
+
+void SparseDB::interpretByte4(uint32_t *val, char *input){
+  uint32_t v = 0;
+  int shift = 0, num_reads = 0;
+
+  for (shift = 24; shift >= 0; shift -= 8) {
+    v |= ((uint32_t)(input[num_reads] & 0xff) << shift); 
+    num_reads++;
+  }
+
+  *val = v;
+}
+
+void SparseDB::interpretByte8(uint64_t *val, char *input){
+  uint64_t v = 0;
+  int shift = 0, num_reads = 0;
+
+  for (shift = 56; shift >= 0; shift -= 8) {
+    v |= ((uint64_t)(input[num_reads] & 0xff) << shift); 
+    num_reads++;
+  }
+
+  *val = v;
+}
+
+void SparseDB::readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
+    MPI_File fh,MPI_Offset off){
+    
+    int count = cct_offsets.size() * 12; //each cct has a 4-byte cct id and 8-byte cct offset
+    char input[count];
+
+    MPI_Status stat;
+    MPI_File_read_at(fh,off,&input,count,MPI_BYTE,&stat);
+
+    for(int i = 0; i<count; i += 12){
+      uint32_t cct_id;
+      uint64_t cct_off;
+      interpretByte4(&cct_id, &input[i]);
+      interpretByte8(&cct_off, &input[i+4]);
+      cct_offsets.emplace_back(cct_id, cct_off);
+    }
+    
+}
+
+//given full cct offsets and a group of cct ids, return a vector of <cct id, offset>
+//my_cct_offsets size == cct_ids size
+int SparseDB::binarySearchCCTid(std::vector<uint32_t>& cct_ids,
+    std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
+    std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets)
+{
+  int n = profile_cct_offsets.size();
+  int m;
+  int found = 0;
+  uint32_t target;
+
+  for(int i = 0; i<cct_ids.size(); i++){
+    target = cct_ids[i];
+    if(found){ // if already found one, no need to binary search again
+      m += 1;
+      if(profile_cct_offsets[m].first == target){
+        my_cct_offsets.emplace_back(target,profile_cct_offsets[m].second);
+      }else if(profile_cct_offsets[m].first > target){
+        //my_cct_offsets.emplace_back(target,0);
+        m -= 1; //back to original since this might be next target
+      }else{ //profile_cct_offsets[m].first < target, should not happen
+        printf("ERROR: SparseDB::binarySearchCCTid(): cct id %d in a profile does not exist in the full cct list.\n", profile_cct_offsets[m].first );
+        return -1;
+      }
+    }else{
+      int L = 0;
+      int R = n - 1;
+      while(L<=R){
+        m = (L+R)/2;
+        if(profile_cct_offsets[m].first < target){
+          L = m + 1;
+        }else if(profile_cct_offsets[m].first > target){
+          R = m - 1;
+        }else{ //find match
+          my_cct_offsets.emplace_back(target,profile_cct_offsets[m].second);
+          found = 1;
+          break;
+        }
+      }
+      //if(!found) my_cct_offsets.emplace_back(target,0);
+
+    }    
+  }
+  my_cct_offsets.emplace_back(profile_cct_offsets[m+1].first,profile_cct_offsets[m+1].second);
+
+  return 1;
+}
+
+
+void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids,
+    std::vector<CCTDataPair>& cct_data_pairs,MPI_File fh,MPI_Offset offset)
+{
+  //offset:beginning of the profile
+  //cct_ids: the ccts it needs to read in for this round for this profile(ascending order)
+
+  //TODO: unify 一下 read bytes first then interpret
+  //TODO: val and mid write together => one seek per cct group
+  //CONSIDER: 这一部分能不能只读一次记录在memory里
+  MPI_Status stat;
+  uint32_t tid;
+  uint64_t num_vals;
+  readAsByte4(&tid,fh,offset);
+  readAsByte8(&num_vals,fh,offset+4);
+
+  uint64_t cct_offsets_offset = offset+12+num_vals*10;
+  uint32_t num_nz_cct;
+  readAsByte4(&num_nz_cct,fh,cct_offsets_offset);
+
+  std::vector<std::pair<uint32_t,uint64_t>> cct_offsets (num_nz_cct);
+  readCCToffsets(cct_offsets,fh,cct_offsets_offset+4);
+
+  uint64_t val_offset = offset+12;
+  uint64_t mid_offset = val_offset + num_vals*8;
+  //END of CONSIDER
+
+  std::vector<std::pair<uint32_t,uint64_t>> my_cct_offsets;
+  binarySearchCCTid(cct_ids,cct_offsets,my_cct_offsets);
+
+  uint64_t val_start_pos = val_offset + my_cct_offsets[0].second * 8;
+  uint64_t val_count = (my_cct_offsets[cct_ids.size()].second - my_cct_offsets[0].second)*8;
+  uint64_t mid_start_pos = mid_offset + my_cct_offsets[0].second * 2;
+  uint64_t mid_count = (my_cct_offsets[cct_ids.size()].second - my_cct_offsets[0].second)*2;
+  char vinput[val_count];
+  char minput[mid_count];
+
+  MPI_File_read_at(fh,val_start_pos,&vinput,val_count,MPI_BYTE,&stat);
+  MPI_File_read_at(fh,mid_start_pos,&minput,mid_count,MPI_BYTE,&stat);
+
+  /*
+  for(int i = 0; i<count; i += 10){
+    uint64_t val;
+    uint16_t mid;
+    interpretByte8(&val, &input[i]);
+    interpretByte2(&mid, &input[i+8]);
+  }
+
+  for(int i = 0,j=0; i<cct_ids.size(); i++){
+    if(cct_ids[i] == my_cct_offsets[j]){
+      //read values
+    }else{//current cct id does not exist in this profile
+      DataBlock data;
+    }
+  }
+  */
+
+
+
+
+
+
+
+}
+
 
 
 //***************************************************************************
@@ -386,6 +596,7 @@ void SparseDB::merge(int threads) {
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
   writeThreadMajor(threads,world_rank,world_size);
+
 
 
 /* TEMP: test some cct major functions
@@ -406,6 +617,26 @@ void SparseDB::merge(int threads) {
   std::cout << "\n\n";
 
   std::cout << "size I am responsible for : " << (cct_off[my_cct[my_cct.size()-1]].second - cct_off[my_cct[0]].second + cct_sizes[my_cct[my_cct.size()-1]].second) <<"\n";
+
+  //TEST for binarySearchCCTid
+  std::vector<std::pair<uint32_t, uint64_t>> profile_cct_offsets (30);
+  for(int i =0;i<30;i++){
+    profile_cct_offsets[i].first = i*2;
+    profile_cct_offsets[i].second = i*10;
+  }
+  std::vector<uint32_t> cct_ids (5);
+  cct_ids[0] = 29;
+  cct_ids[1] = 30;
+  cct_ids[2] = 31;
+  cct_ids[3] = 32;
+  cct_ids[4] = 36;
+  std::vector<std::pair<uint32_t, uint64_t>> my_cct_offs;
+  binarySearchCCTid(cct_ids,profile_cct_offsets,my_cct_offs);
+  for(auto c :profile_cct_offsets) std::cout << c.first << ":" << c.second << " | ";
+  std::cout << "\n";
+  for(auto c :my_cct_offs) std::cout << c.first << ":" << c.second << " | ";
+  std::cout << "\n";
+
 */
 }
 

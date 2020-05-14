@@ -130,6 +130,11 @@ typedef struct hpcrun_sparse_file {
 
 } hpcrun_sparse_file_t;
 
+static const int SPARSE_FILE_SUCCEED = 0;
+static const int SPARSE_FILE_FAIL = 1;
+static const int SPARSE_FILE_ERR = -1;
+static const int SPARSE_FILE_FOOTER_SIZE = 56; 
+
 //***************************************************************************
 // hdr
 //***************************************************************************

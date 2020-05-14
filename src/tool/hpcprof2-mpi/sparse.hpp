@@ -52,6 +52,8 @@
 #include "lib/profile/util/once.hpp"
 #include "lib/profile/util/locked_unordered.hpp"
 
+#include "lib/prof-lean/hpcrun-fmt.h"
+
 #include <vector>
 #include <mpi.h>
 
@@ -82,6 +84,19 @@ public:
   void notifyThreadFinal(const hpctoolkit::Thread::Temporary&) override;
 
   //YUMENG
+  //TODO: change names... these are bad...
+  struct DataBlock{
+    uint16_t mid;
+    uint32_t num_values; // can be set at the end, used as offset for mid
+    std::vector<hpcrun_metricVal_t> values;
+    std::vector<uint32_t> tids;
+  };
+
+  struct CCTDataPair{
+    uint32_t cct_id;
+    DataBlock* data;
+  };
+
   uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
   uint32_t getTotalNumProfiles(uint32_t my_num_prof);
   uint64_t getMyOffset(uint64_t my_size,int rank);
@@ -101,6 +116,18 @@ public:
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
     std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank);
+  void readAsByte4(uint32_t *val, MPI_File fh, MPI_Offset off);
+  void readAsByte8(uint64_t *val, MPI_File fh, MPI_Offset off);
+  void interpretByte2(uint16_t *val, char *input);
+  void interpretByte4(uint32_t *val, char *input);
+  void interpretByte8(uint64_t *val, char *input);
+  void readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
+    MPI_File fh,MPI_Offset off);
+  int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
+    std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
+    std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
+  void readOneProfile(std::vector<uint32_t>& cct_ids,
+    std::vector<CCTDataPair>& cct_data_pairs,MPI_File fh,MPI_Offset offset);
   void merge(int);
   void exscan(std::vector<uint64_t>& data,int threads); 
 
@@ -120,5 +147,11 @@ private:
     hpctoolkit::stdshim::filesystem::path> outputs;
   std::atomic<std::size_t> outputCnt;
 };
+
+
+
+
+
+
 
 #endif  // HPCTOOLKIT_PROF2MPI_SPARSE_H

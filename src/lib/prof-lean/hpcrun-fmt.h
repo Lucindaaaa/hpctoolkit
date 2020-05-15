@@ -130,10 +130,38 @@ typedef struct hpcrun_sparse_file {
 
 } hpcrun_sparse_file_t;
 
-static const int SPARSE_FILE_SUCCEED = 0;
-static const int SPARSE_FILE_FAIL = 1;
-static const int SPARSE_FILE_ERR = -1;
-static const int SPARSE_FILE_FOOTER_SIZE = 56; 
+static const int SF_SUCCEED = 0;
+static const int SF_END = 0;
+static const int SF_FAIL = 1;
+static const int SF_ERR = -1;
+
+// -------------------------------------------------------
+// Format of footer: array with size 7, each is 8 bytes
+// hdr_offset  loadmap_offset  num_cct  cct_offset  
+//     0             1            2         3         
+// metric-tbl_offset  sparse-metrics_offset  footer_offset
+//        4                  5                      6
+// -------------------------------------------------------
+static const int SF_FOOTER_SIZE = 56; 
+static const int SF_FOOTER_hdr = 0; 
+static const int SF_FOOTER_lm = 1; 
+static const int SF_FOOTER_num_cct = 2; 
+static const int SF_FOOTER_cct = 3; 
+static const int SF_FOOTER_metric_tbl= 4; 
+static const int SF_FOOTER_sparse_metrics = 5; 
+static const int SF_FOOTER_footer = 6; 
+
+static const int SF_num_lm_SIZE = 4; 
+static const int SF_num_metric_SIZE = 4;
+static const int SF_num_cct_SIZE = 8;
+static const int SF_cct_node_SIZE = 18; // id:4 id-parent:4 lm-id:2 im-ip:8
+static const int SF_tid_SIZE = 4;
+static const int SF_num_val_SIZE = 8;
+static const int SF_val_SIZE = 8;
+static const int SF_mid_SIZE = 2;
+static const int SF_num_nz_cct_SIZE = 4;
+static const int SF_cct_id_SIZE = 4;
+static const int SF_cct_off_SIZE = 8;
 
 //***************************************************************************
 // hdr

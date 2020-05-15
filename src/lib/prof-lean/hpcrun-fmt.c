@@ -754,6 +754,13 @@ hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 
 //***************************************************************************
 // sparse metircs - YUMENG
+// 
+// Format: (meaning of the data : number of bytes)
+// Thread ID:4 | Number of non-zero values:8 | 
+// Non-zero values:8 * Number of non-zero values |
+// Metric IDs of non-zero values:2 * Number of non-zero value |
+// Number of CCTs that have non-zero values:4
+// Pair of CCT ID and corresponding offsets (index at values and metirc IDs):(4+8)*Number of CCTs that have non-zero values
 //***************************************************************************
 
  int
@@ -877,6 +884,15 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 
 //***************************************************************************
 // hpcrun_sparse_file - YUMENG
+//
+// File sections in order:
+// hdr, loadmap, ccts, metric-tbl, sparse metrics, footer
+//
+// Format of footer: array with size 7, each is 8 bytes
+// hdr_offset  loadmap_offset  num_cct  cct_offset  
+//     0             1            2         3         
+// metric-tbl_offset  sparse-metrics_offset  footer_offset
+//        4                  5                      6
 //***************************************************************************
 hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path)
 {
@@ -896,7 +912,7 @@ hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path)
 
   //initialize footer
   fseek(fs, 0, SEEK_END);
-  size_t footer_position = ftell(fs) - SPARSE_FILE_FOOTER_SIZE;
+  size_t footer_position = ftell(fs) - SF_FOOTER_SIZE;
   fseek(fs, footer_position, SEEK_SET);
   for(int i = 0; i<7; i++){
     if( hpcfmt_int8_fread(&(sparse_fs->footer[i]), fs) != HPCFMT_OK) {
@@ -904,7 +920,7 @@ hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path)
       return NULL;
     }
   }
-  fseek(fs, sparse_fs->footer[0], SEEK_SET);
+  fseek(fs, sparse_fs->footer[SF_FOOTER_hdr], SEEK_SET);
 
   return sparse_fs;
 }
@@ -924,14 +940,14 @@ int hpcrun_sparse_resume(hpcrun_sparse_file_t* sparse_fs, const char* path)
   if(sparse_fs->mode == OPENED){
     fprintf(stderr, "ERROR: the file descriptor in the hpcrun_sparse_file object is still open\n");
     //exit(-1); //maybe change to not exit directly?
-    return SPARSE_FILE_ERR;
+    return SF_ERR;
   }
   FILE* fs = hpcio_fopen_r(path);
-  if(!fs) return SPARSE_FILE_FAIL;
+  if(!fs) return SF_FAIL;
   sparse_fs->file = fs;
   fseek(fs, sparse_fs->cur_pos, SEEK_SET);
   sparse_fs->mode = OPENED;
-  return SPARSE_FILE_SUCCEED;
+  return SF_SUCCEED;
 }
 
 void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs)
@@ -943,33 +959,33 @@ void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs)
 /* succeed: returns 0; error while reading: returns -1 */
 int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hdr)
 {
-  fseek(sparse_fs->file, sparse_fs->footer[0],SEEK_SET);
+  fseek(sparse_fs->file, sparse_fs->footer[SF_FOOTER_hdr],SEEK_SET);
   int ret = hpcrun_fmt_hdr_fread(hdr, sparse_fs->file, malloc);
-  if(ret != HPCFMT_OK) return SPARSE_FILE_ERR;
-  return SPARSE_FILE_SUCCEED;
+  if(ret != HPCFMT_OK) return SF_ERR;
+  return SF_SUCCEED;
 }
 
 /* succeed: returns positive id; End of list: returns 0; Fail reading: returns -1; */
 int hpcrun_sparse_next_lm(hpcrun_sparse_file_t* sparse_fs, loadmap_entry_t* lm)
 {
-  if(sparse_fs->cur_lm == 0) sparse_fs->cur_lm = 4; //the first lm should skip the info about number of lms
+  if(sparse_fs->cur_lm == 0) sparse_fs->cur_lm = SF_num_lm_SIZE; //the first lm should skip the info about number of lms
 
-  size_t realoffset = sparse_fs->footer[1] + sparse_fs->cur_lm;
-  if(realoffset == sparse_fs->footer[3]) return 0; // no more next lm
+  size_t realoffset = sparse_fs->footer[SF_FOOTER_lm] + sparse_fs->cur_lm;
+  if(realoffset == sparse_fs->footer[SF_FOOTER_cct]) return SF_END; // no more next lm
   fseek(sparse_fs->file, realoffset, SEEK_SET);
   int ret = hpcrun_fmt_loadmapEntry_fread(lm, sparse_fs->file, malloc);
   sparse_fs->cur_lm += ret;
 
-  return (lm) ? lm->id : HPCFMT_ERR;
+  return (lm) ? lm->id : SF_ERR;
 }
 
 /* succeed: returns a metric ID; end of list: returns 0; error: returns -1 */
 int hpcrun_sparse_next_metric(hpcrun_sparse_file_t* sparse_fs, metric_desc_t* m, metric_aux_info_t* perf_info,double fmtVersion)
 {
-  if(sparse_fs->cur_metric == 0) sparse_fs->cur_metric = 4; //the first metric should skip the info about number of metrics
+  if(sparse_fs->cur_metric == 0) sparse_fs->cur_metric = SF_num_metric_SIZE; //the first metric should skip the info about number of metrics
 
-  size_t realoffset = sparse_fs->footer[4] + sparse_fs->cur_metric;
-  if(realoffset == sparse_fs->footer[5]) return 0; // no more next metric
+  size_t realoffset = sparse_fs->footer[SF_FOOTER_metric_tbl] + sparse_fs->cur_metric;
+  if(realoffset == sparse_fs->footer[SF_FOOTER_sparse_metrics]) return SF_END; // no more next metric
   fseek(sparse_fs->file, realoffset, SEEK_SET);
   HPCFMT_ThrowIfError(hpcrun_fmt_metricDesc_fread(m, perf_info, sparse_fs->file, fmtVersion, malloc));
   sparse_fs->cur_metric_id += 1;
@@ -981,8 +997,8 @@ int hpcrun_sparse_next_metric(hpcrun_sparse_file_t* sparse_fs, metric_desc_t* m,
 /* succeed: returns a cct ID; end of list: returns 0; error: returns -1 */
 int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_node_t* node)
 {
-  if(sparse_fs->cur_cct == sparse_fs->footer[2]) return 0; //no more cct
-  size_t realoffset = sparse_fs->footer[3] + (18 * sparse_fs->cur_cct) + 8; //8 is the info about number of ccts
+  if(sparse_fs->cur_cct == sparse_fs->footer[SF_FOOTER_num_cct]) return SF_END; //no more cct
+  size_t realoffset = sparse_fs->footer[SF_FOOTER_cct] + (SF_cct_node_SIZE * sparse_fs->cur_cct) + SF_num_cct_SIZE; 
   fseek(sparse_fs->file, realoffset, SEEK_SET);
   epoch_flags_t fake = {0};//need to remove in the future
   node->num_metrics = 0;
@@ -995,27 +1011,27 @@ int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_n
 int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
 {
   if(sparse_fs->cur_block == 0){
-    fseek(sparse_fs->file,(sparse_fs->footer[5]+4),SEEK_SET);
+    fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE),SEEK_SET);
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->num_nzval),sparse_fs->file));
-    fseek(sparse_fs->file,(sparse_fs->footer[5]+12+10*(sparse_fs->num_nzval)),SEEK_SET);
+    fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE+SF_num_val_SIZE+(SF_val_SIZE+SF_mid_SIZE)*(sparse_fs->num_nzval)),SEEK_SET);
     HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(sparse_fs->num_nz_cct),sparse_fs->file));
-    sparse_fs->val_offset = sparse_fs->footer[5]+ 12;
-    sparse_fs->metric_pos_offset = sparse_fs->val_offset + 8*(sparse_fs->num_nzval);
-    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + 2*(sparse_fs->num_nzval) +4; //change 10 to 2 for m_offset removal
+    sparse_fs->val_offset = sparse_fs->footer[SF_FOOTER_sparse_metrics]+ SF_tid_SIZE+SF_num_val_SIZE;
+    sparse_fs->metric_pos_offset = sparse_fs->val_offset + SF_val_SIZE*(sparse_fs->num_nzval);
+    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->num_nzval) + SF_num_nz_cct_SIZE; //change 10 to 2 for m_offset removal
   }
-  if(sparse_fs->cur_block == sparse_fs->num_nz_cct) return 0; //no more cct block
+  if(sparse_fs->cur_block == sparse_fs->num_nz_cct) return SF_END; //no more cct block
 
   //seek to the first metric_position(id:offset) related to this cct
-  fseek(sparse_fs->file,(sparse_fs->cct_offset_offset + 12*sparse_fs->cur_block),SEEK_SET);
+  fseek(sparse_fs->file,(sparse_fs->cct_offset_offset + (SF_cct_id_SIZE+SF_cct_off_SIZE)*sparse_fs->cur_block),SEEK_SET);
   size_t metric_block_pos;
   int id;
   HPCFMT_ThrowIfError(hpcfmt_int4_fread(&id,sparse_fs->file));
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&metric_block_pos,sparse_fs->file));
-  fseek(sparse_fs->file,4,SEEK_CUR);
+  fseek(sparse_fs->file,SF_cct_id_SIZE,SEEK_CUR);
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->cur_block_end),sparse_fs->file));
   if(sparse_fs->cur_block == sparse_fs->num_nz_cct - 1) sparse_fs->cur_block_end = sparse_fs->num_nzval;
-  if(metric_block_pos == sparse_fs->num_nzval) return 0; //might not be end of cct, but rest blocks are all empty
-  fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + 2*metric_block_pos),SEEK_SET); //change 10 to 2 for m_offset removal
+  if(metric_block_pos == sparse_fs->num_nzval) return SF_END; //might not be end of cct, but rest blocks are all empty
+  fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + SF_mid_SIZE*metric_block_pos),SEEK_SET); //change 10 to 2 for m_offset removal
   sparse_fs->cur_block++;
 
   return id;
@@ -1028,22 +1044,22 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
 {
   if(sparse_fs->cur_block == 0){
     printf("ERROR: hpcrun_sparse_next_entry() has to be called after hpcrun_sparse_next_block() to set up entry point.\n");
-    return HPCFMT_ERR;
+    return SF_ERR;
   }
   size_t cur_pos = ftell(sparse_fs->file);
-  if(cur_pos == sparse_fs->metric_pos_offset + 2*(sparse_fs->cur_block_end) )return 0; //change 10 to 2 for m_offset removal
+  if(cur_pos == sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->cur_block_end) )return SF_END; //change 10 to 2 for m_offset removal
 
   uint16_t id;
   uint64_t offset;
   HPCFMT_ThrowIfError(hpcfmt_int2_fread(&id,sparse_fs->file));
   //HPCFMT_ThrowIfError(hpcfmt_int8_fread(&offset,sparse_fs->file));
   id ++; //match the metric id in metricTbl(starting as 1), it was recorded starting as 0
-  offset = (cur_pos - sparse_fs->metric_pos_offset)/2; //for one thread, each metric id only has one value
+  offset = (cur_pos - sparse_fs->metric_pos_offset)/SF_mid_SIZE; //for one thread, each metric id only has one value
 
   //If MULTIPLE THREADS, then it will be a loop to get all values for one metric id
   fseek(sparse_fs->file,(sparse_fs->val_offset)+8*offset,SEEK_SET);
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(val->bits),sparse_fs->file));
-  fseek(sparse_fs->file,cur_pos+2,SEEK_SET); //set for next entry //change 10 to 2 for m_offset removal
+  fseek(sparse_fs->file,cur_pos+SF_mid_SIZE,SEEK_SET); //set for next entry //change 10 to 2 for m_offset removal
 
   return id;
 }

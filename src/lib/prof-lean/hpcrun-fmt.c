@@ -888,11 +888,9 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 // File sections in order:
 // hdr, loadmap, ccts, metric-tbl, sparse metrics, footer
 //
-// Format of footer: array with size 7, each is 8 bytes
-// hdr_offset  loadmap_offset  num_cct  cct_offset  
-//     0             1            2         3         
-// metric-tbl_offset  sparse-metrics_offset  footer_offset
-//        4                  5                      6
+// Format of footer: array with size 7, each is 8 bytes  
+// hdr_offset  loadmap_offset  num_cct  cct_offset  metric-tbl_offset  sparse-metrics_offset  footer_offset
+//     0             1            2         3               4                  5                      6         
 //***************************************************************************
 hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path)
 {

@@ -1044,12 +1044,12 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ------------------------------------------------------------
   size_t footer[7];
   fseek(infs, 0, SEEK_END); 
-  size_t footer_position = ftell(infs) - 56;
+  size_t footer_position = ftell(infs) - SF_FOOTER_SIZE;
   fseek(infs, footer_position, SEEK_SET); 
   for(int i = 0; i<7; i++){
     hpcfmt_int8_fread(&(footer[i]), infs);
   }
-  fseek(infs, footer[0], SEEK_SET); 
+  fseek(infs, footer[SF_FOOTER_hdr], SEEK_SET); 
 
   // ------------------------------------------------------------
   // hdr
@@ -1078,7 +1078,7 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   //YUMENG: no epoch info needed
   //uint num_epochs = 0;
   size_t file_cur = 0;
-  while ( !feof(infs) && (file_cur != footer[6])) {
+  while ( !feof(infs) && (file_cur != footer[SF_FOOTER_footer])) {
 
     Profile* myprof = NULL;
 
@@ -1109,7 +1109,7 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
 
    //footer print YUMENG
    file_cur = ftell(infs);
-   if((file_cur == footer[6]) && outfs){
+   if((file_cur == footer[SF_FOOTER_footer]) && outfs){
      fprintf(outfs,"[footer: \n  ");
      for(int i = 0; i<7;i++){
        fprintf(outfs,"%d ",footer[i]);

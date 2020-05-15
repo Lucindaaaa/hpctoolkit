@@ -99,6 +99,7 @@ enum ProfType_t {
   ProfType_SparseDBthread //YUMENG
 };
 
+
 ProfType_t
 getProfileType(const std::string& filenm);
 

@@ -177,6 +177,29 @@ void SparseDB::write() {};
 
 //***************************************************************************
 // thread_major_sparse.db  - YUMENG
+//
+// Format: data:size in bytes
+// [Threads offsets] Number of profiles:4 | Offsets for all profiles in order:8 * Number of profiles
+// [sparse metrics] 
+// ThreadID:4 | Number of non-zero values:8 | 
+// Non-zero values:8 * Number of non-zero values |
+// Metric IDs of non-zero values:2 * Number of non-zero value |
+// Number of CCTs that have non-zero values:4
+// Pair of CCT ID and corresponding offsets (index at values and metirc IDs):(4+8)*Number of CCTs that have non-zero values
+
+/*EXAMPLE
+[Threads offsets (thread id : offset)
+  (0:28 1:2388 2:4520 )
+]
+[sparse metrics:
+  (thread ID: 0)
+  (number of non-zero metrics: 136)
+  (values:  1.17864  1.17864  1.17864  1.17864  0.000413  0.000102  0.000102)
+  (metric id: 0 1 0 1 1 1 1)
+  (cct offsets (cct id : offset): 1:0 163:1 165:2 167:3 169:4 171:5 173:6)
+]
+...same [sparse metrics] for thread 1 and 2
+*/
 //***************************************************************************
 uint64_t SparseDB::getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes){
   uint64_t my_size = 0;
@@ -217,7 +240,7 @@ void SparseDB::getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_
   #pragma omp parallel for num_threads(threads)
   for(int i = 0; i<tmp.size();i++){
     prof_offsets[i].first = profile_sizes[i].first->attributes.threadid();
-    prof_offsets[i].second = tmp[i] + my_offset + (total_prof*8) + 4; //4 bytes for number of threads/profile, 8 bytes each for each offset
+    prof_offsets[i].second = tmp[i] + my_offset + (total_prof * TMS_prof_offset_SIZE) + TMS_total_prof_SIZE; //4 bytes for number of threads/profile, 8 bytes each for each offset
   }
 }
 
@@ -255,7 +278,7 @@ void SparseDB::writeProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_
 
   #pragma omp parallel for num_threads(threads)
   for(int i = 0; i < prof_offsets.size(); i++) {
-    int off = 4 + (prof_offsets[i].first*8);
+    int off = TMS_total_prof_SIZE + (prof_offsets[i].first*TMS_prof_offset_SIZE);
     writeAsByte8(prof_offsets[i].second,fh,off);
   }
 }

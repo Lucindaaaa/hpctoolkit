@@ -97,6 +97,12 @@ public:
     DataBlock* data;
   };
 
+  //***************************************************************************
+  // thread_major_sparse.db  - YUMENG
+  //***************************************************************************
+  const int TMS_total_prof_SIZE   = 4;
+  const int TMS_prof_offset_SIZE  = 8;
+
   uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
   uint32_t getTotalNumProfiles(uint32_t my_num_prof);
   uint64_t getMyOffset(uint64_t my_size,int rank);
@@ -112,6 +118,9 @@ public:
   void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
   void writeThreadMajor(int threads, int world_rank, int world_size);
 
+  //***************************************************************************
+  // cct_major_sparse.db  - YUMENG
+  //***************************************************************************
   void getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_sizes,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,

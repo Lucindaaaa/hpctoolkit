@@ -127,6 +127,7 @@ public:
   void getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
       std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
       uint32_t total_prof, uint64_t my_offset, int threads);
+
   void writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
       std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
       MPI_File fh, uint32_t total_prof, int rank, int threads);
@@ -162,6 +163,7 @@ public:
     std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh,MPI_Offset offset);
   void merge(int);
   void exscan(std::vector<uint64_t>& data,int threads); 
+
 
 
 private:

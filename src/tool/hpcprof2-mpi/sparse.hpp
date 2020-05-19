@@ -84,6 +84,13 @@ public:
   void notifyThreadFinal(const hpctoolkit::Thread::Temporary&) override;
 
   //YUMENG
+  struct ProfileInfo{
+    //uint32_t tid;
+    uint64_t num_val;
+    uint32_t num_nzcct;
+    uint64_t offset;
+  };
+
   //TODO: change names... these are bad...
   struct DataBlock{
     uint16_t mid;
@@ -101,7 +108,12 @@ public:
   // thread_major_sparse.db  - YUMENG
   //***************************************************************************
   const int TMS_total_prof_SIZE   = 4;
+  const int TMS_tid_SIZE          = 4;
+  const int TMS_num_val_SIZE      = 8;
+  const int TMS_num_nzcct_SIZE    = 4;
   const int TMS_prof_offset_SIZE  = 8;
+  const int TMS_prof_skip_SIZE    = TMS_tid_SIZE + TMS_num_val_SIZE + TMS_num_nzcct_SIZE; 
+  const int TMS_prof_info_SIZE    = TMS_tid_SIZE + TMS_num_val_SIZE + TMS_num_nzcct_SIZE + TMS_prof_offset_SIZE;
 
   uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
   uint32_t getTotalNumProfiles(uint32_t my_num_prof);
@@ -109,13 +121,16 @@ public:
   void getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
       std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
       uint32_t total_prof, uint64_t my_offset, int threads);
-  void writeProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+  void writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+      std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
       MPI_File fh, uint32_t total_prof, int rank, int threads);
   void writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
-    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes, MPI_File fh, 
-    int threads);
+    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
+    std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
+    MPI_File fh, int threads);
   void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
   void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
+  void writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off);
   void writeThreadMajor(int threads, int world_rank, int world_size);
 
   //***************************************************************************

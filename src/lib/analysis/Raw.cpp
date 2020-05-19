@@ -157,6 +157,18 @@ Analysis::Raw::writeAsText_sparseDBtmp(const char* filenm)
 }
 
 //YUMENG
+bool 
+Analysis::Raw::profileInfoOffsets_sorter(tms_profile_info_t const& lhs, tms_profile_info_t const& rhs) {
+    return lhs.offset< rhs.offset;
+}
+
+void
+Analysis::Raw::sortProfileInfo_onOffsets(tms_profile_info_t* x, uint32_t num_prof)
+{
+    std::sort(x,x+num_prof,&profileInfoOffsets_sorter);
+}
+
+//YUMENG
 void
 Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
 {
@@ -169,16 +181,20 @@ Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
       DIAG_Throw("error opening thread sparse file '" << filenm << "'");
     }
     uint32_t num_prof;
-    uint64_t* x = tms_thread_offset_fread(&num_prof,fs);
-    tms_thread_offset_fprint(num_prof,x,ofs);
+    tms_profile_info_t* x;
+    tms_profile_info_fread(&x, &num_prof,fs);
+    tms_profile_info_fprint(num_prof,x,ofs);
+    sortProfileInfo_onOffsets(x,num_prof);
 
     for(int i = 0; i<num_prof; i++){
       hpcrun_fmt_sparse_metrics_t sm;
-      int ret = hpcrun_fmt_sparse_metrics_fread(&sm,fs);
+      sm.num_vals = x[i].num_val;
+      sm.num_nz_cct = x[i].num_nzcct;
+      int ret = tms_sparse_metrics_fread(&sm,fs);
       if (ret != HPCFMT_OK) {
         DIAG_Throw("error reading thread sparse file '" << filenm << "'");
       }
-      hpcrun_fmt_sparse_metrics_fprint(&sm,ofs,NULL, "  ");
+      tms_sparse_metrics_fprint(&sm,ofs,NULL, "  ");
     }
     
     hpcio_fclose(fs);

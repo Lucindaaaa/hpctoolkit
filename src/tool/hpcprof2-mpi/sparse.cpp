@@ -188,14 +188,15 @@ void SparseDB::write() {};
 // Pair of CCT ID and corresponding offsets (index at values and metirc IDs):(4+8)*Number of CCTs that have non-zero values
 
 /*EXAMPLE
-[Threads offsets (thread id : offset)
+[Threads offsets (thread id :offset8)
   (0:28 1:2388 2:4520 )
 ]
 [sparse metrics:
-  (thread ID: 0)
-  (number of non-zero metrics: 136)
-  (values:  1.17864  1.17864  1.17864  1.17864  0.000413  0.000102  0.000102)
-  (metric id: 0 1 0 1 1 1 1)
+  (thread ID4: 0)
+  (number of non-zero metrics8: 136)
+  (values8:  1.17864  1.17864  1.17864  1.17864  0.000413  0.000102  0.000102)
+  (metric id2: 0 1 0 1 1 1 1)
+  (number of nonzero CCT: )
   (cct offsets (cct id : offset): 1:0 163:1 165:2 167:3 169:4 171:5 173:6)
 ]
 ...same [sparse metrics] for thread 1 and 2
@@ -206,8 +207,8 @@ uint64_t SparseDB::getProfileSizes(std::vector<std::pair<const hpctoolkit::Threa
   for(const auto& tp: outputs.citerate()) {
     struct stat buf;
     stat(tp.second.string().c_str(),&buf);
-    my_size += buf.st_size;
-    profile_sizes.emplace_back(tp.first,buf.st_size);    
+    my_size += (buf.st_size - TMS_prof_skip_SIZE);
+    profile_sizes.emplace_back(tp.first,(buf.st_size - TMS_prof_skip_SIZE));    
   }
   return my_size;
 }
@@ -240,7 +241,7 @@ void SparseDB::getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_
   #pragma omp parallel for num_threads(threads)
   for(int i = 0; i<tmp.size();i++){
     prof_offsets[i].first = profile_sizes[i].first->attributes.threadid();
-    prof_offsets[i].second = tmp[i] + my_offset + (total_prof * TMS_prof_offset_SIZE) + TMS_total_prof_SIZE; //4 bytes for number of threads/profile, 8 bytes each for each offset
+    prof_offsets[i].second = tmp[i] + my_offset + (total_prof * TMS_prof_info_SIZE) + TMS_total_prof_SIZE; 
   }
 }
 
@@ -272,20 +273,27 @@ void SparseDB::writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off){
 
 }
 
-void SparseDB::writeProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, MPI_File fh, 
-    uint32_t total_prof, int rank, int threads){
+void SparseDB::writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off){
+  MPI_Status stat;
+  MPI_File_write_at(fh,off,val.data(),size,MPI_BYTE,&stat);
+}
+
+void SparseDB::writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
+    MPI_File fh, uint32_t total_prof, int rank, int threads){
   if(rank == 0) writeAsByte4(total_prof,fh,0);
 
   #pragma omp parallel for num_threads(threads)
   for(int i = 0; i < prof_offsets.size(); i++) {
-    int off = TMS_total_prof_SIZE + (prof_offsets[i].first*TMS_prof_offset_SIZE);
-    writeAsByte8(prof_offsets[i].second,fh,off);
+    MPI_Offset off = TMS_total_prof_SIZE + (prof_offsets[i].first*TMS_prof_info_SIZE);
+    std::vector<char> info = prof_infos[prof_offsets[i].first]; 
+    writeAsByteX(info,TMS_prof_skip_SIZE,fh,off);
+    writeAsByte8(prof_offsets[i].second,fh,off+TMS_prof_skip_SIZE);
   }
 }
 
 void SparseDB::writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
-    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes, MPI_File fh, 
-    int threads){
+    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes, std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
+    MPI_File fh, int threads){
 
   #pragma omp parallel for num_threads(threads)
   for(auto i = 0; i<profile_sizes.size();i++){
@@ -305,9 +313,15 @@ void SparseDB::writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_of
         (std::istreambuf_iterator<char>()));
     input.close();
 
+    //extract bytes for profile information
+    std::vector<char> info (TMS_prof_info_SIZE);
+    std::copy(bytes.data(),bytes.data()+TMS_prof_skip_SIZE,info.begin());
+    prof_infos.emplace(tid,info);
+
+
     //write at specific place
     MPI_Status stat;
-    MPI_File_write_at(fh,my_prof_offset, bytes.data(), bytes.size(), MPI_BYTE, &stat);
+    MPI_File_write_at(fh,my_prof_offset, bytes.data()+TMS_prof_skip_SIZE, bytes.size()-TMS_prof_skip_SIZE, MPI_BYTE, &stat);
   }
     
 }
@@ -332,9 +346,9 @@ void SparseDB::writeThreadMajor(int threads, int world_rank, int world_size){
   MPI_File_open(MPI_COMM_WORLD, (dir / "thread_major_sparse.db").c_str(),
                   MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &thread_major_f); 
 
-  writeProfOffset(prof_offsets,thread_major_f,total_prof, world_rank,threads/world_size);
-  writeProfiles(prof_offsets, profile_sizes, thread_major_f, threads/world_size);
- 
+  std::unordered_map<uint32_t,std::vector<char>> prof_infos;
+  writeProfiles(prof_offsets, profile_sizes, prof_infos, thread_major_f, threads/world_size);
+  writeProfInfo(prof_offsets,prof_infos, thread_major_f,total_prof, world_rank,threads/world_size);
   MPI_File_close(&thread_major_f);
 
 }

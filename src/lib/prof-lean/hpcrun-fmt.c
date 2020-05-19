@@ -769,6 +769,7 @@ hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
 
   HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(x->tid), fs));
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->num_vals), fs));
+  HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(x->num_nz_cct), fs));
 
   x->values = (hpcrun_metricVal_t *) malloc((x->num_vals)*sizeof(hpcrun_metricVal_t));
   for (int i = 0; i < x->num_vals; ++i) {
@@ -782,7 +783,7 @@ hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
     //HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->m_offset[i], fs));
   }
 
-  HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(x->num_nz_cct), fs));
+  //HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(x->num_nz_cct), fs));
   x->cct_id = (uint32_t *) malloc((x->num_nz_cct)*sizeof(uint32_t));
   x->cct_off = (uint64_t *) malloc((x->num_nz_cct)*sizeof(uint64_t));
   for (int i = 0; i < x->num_nz_cct; ++i) {
@@ -799,6 +800,7 @@ hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x,FILE* fs)
 {
   HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->tid, fs));
   HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->num_vals, fs));
+  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->num_nz_cct, fs));
 
 
   for (int i = 0; i < x->num_vals; ++i) {
@@ -812,7 +814,7 @@ hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x,FILE* fs)
     
   }
 
-  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->num_nz_cct, fs));
+  //HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->num_nz_cct, fs));
 
   for (int i = 0; i < x->num_nz_cct; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->cct_id[i], fs));
@@ -1011,11 +1013,12 @@ int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
   if(sparse_fs->cur_block == 0){
     fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE),SEEK_SET);
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->num_nzval),sparse_fs->file));
-    fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE+SF_num_val_SIZE+(SF_val_SIZE+SF_mid_SIZE)*(sparse_fs->num_nzval)),SEEK_SET);
+    //fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE+SF_num_val_SIZE+(SF_val_SIZE+SF_mid_SIZE)*(sparse_fs->num_nzval)),SEEK_SET);
+    fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE+SF_num_val_SIZE),SEEK_SET);
     HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(sparse_fs->num_nz_cct),sparse_fs->file));
-    sparse_fs->val_offset = sparse_fs->footer[SF_FOOTER_sparse_metrics]+ SF_tid_SIZE+SF_num_val_SIZE;
+    sparse_fs->val_offset = sparse_fs->footer[SF_FOOTER_sparse_metrics]+ SF_tid_SIZE+SF_num_val_SIZE+ SF_num_nz_cct_SIZE;
     sparse_fs->metric_pos_offset = sparse_fs->val_offset + SF_val_SIZE*(sparse_fs->num_nzval);
-    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->num_nzval) + SF_num_nz_cct_SIZE; //change 10 to 2 for m_offset removal
+    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->num_nzval); 
   }
   if(sparse_fs->cur_block == sparse_fs->num_nz_cct) return SF_END; //no more cct block
 
@@ -1029,7 +1032,7 @@ int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->cur_block_end),sparse_fs->file));
   if(sparse_fs->cur_block == sparse_fs->num_nz_cct - 1) sparse_fs->cur_block_end = sparse_fs->num_nzval;
   if(metric_block_pos == sparse_fs->num_nzval) return SF_END; //might not be end of cct, but rest blocks are all empty
-  fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + SF_mid_SIZE*metric_block_pos),SEEK_SET); //change 10 to 2 for m_offset removal
+  fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + SF_mid_SIZE*metric_block_pos),SEEK_SET); 
   sparse_fs->cur_block++;
 
   return id;
@@ -1045,7 +1048,7 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
     return SF_ERR;
   }
   size_t cur_pos = ftell(sparse_fs->file);
-  if(cur_pos == sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->cur_block_end) )return SF_END; //change 10 to 2 for m_offset removal
+  if(cur_pos == sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->cur_block_end) )return SF_END; 
 
   uint16_t id;
   uint64_t offset;
@@ -1055,9 +1058,9 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
   offset = (cur_pos - sparse_fs->metric_pos_offset)/SF_mid_SIZE; //for one thread, each metric id only has one value
 
   //If MULTIPLE THREADS, then it will be a loop to get all values for one metric id
-  fseek(sparse_fs->file,(sparse_fs->val_offset)+8*offset,SEEK_SET);
+  fseek(sparse_fs->file,(sparse_fs->val_offset)+SF_val_SIZE*offset,SEEK_SET);
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(val->bits),sparse_fs->file));
-  fseek(sparse_fs->file,cur_pos+SF_mid_SIZE,SEEK_SET); //set for next entry //change 10 to 2 for m_offset removal
+  fseek(sparse_fs->file,cur_pos+SF_mid_SIZE,SEEK_SET); //set for next entry 
 
   return id;
 }
@@ -1067,40 +1070,129 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
 // thread_major_sparse.db helper - YUMENG
 //***************************************************************************
 int
-tms_thread_offset_fwrite(uint32_t num_t,uint64_t* x, FILE* fs)
+tms_profile_info_fwrite(uint32_t num_t,tms_profile_info_t* x, FILE* fs)
 {
   HPCFMT_ThrowIfError(hpcfmt_int4_fwrite(num_t, fs));
 
   for (int i = 0; i < num_t; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int4_fwrite(x[i].tid, fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x[i].num_val, fs));
+    HPCFMT_ThrowIfError(hpcfmt_int4_fwrite(x[i].num_nzcct, fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x[i].offset, fs));
   }
   return HPCFMT_OK;
 }
 
-uint64_t* 
-tms_thread_offset_fread(uint32_t* num_t,FILE* fs)
+int
+tms_profile_info_fread(tms_profile_info_t** x, uint32_t* num_t,FILE* fs)
 {
   HPCFMT_ThrowIfError(hpcfmt_int4_fread(num_t, fs));
 
-  uint64_t* x = (uint64_t *) malloc((*num_t)*sizeof(uint64_t));
+  tms_profile_info_t * profile_infos = (tms_profile_info_t *) malloc((*num_t)*sizeof(tms_profile_info_t));
 
   for (int i = 0; i < *num_t; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(profile_infos[i].tid), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(profile_infos[i].num_val), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(profile_infos[i].num_nzcct), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(profile_infos[i].offset), fs));
   }
-  return x;
+
+  *x = profile_infos;
+  return HPCFMT_OK;
 }
 
 void
-tms_thread_offset_fprint(uint32_t num_t,uint64_t* x, FILE* fs)
+tms_profile_info_fprint(uint32_t num_t,tms_profile_info_t* x, FILE* fs)
 {
-  fprintf(fs,"[Threads offsets (thread id : offset)\n  (");
+  fprintf(fs,"[Profile informations (thread id : number of nonzero values : number of nonzero CCTs : offset)\n  (");
 
   for (int i = 0; i < num_t; ++i) {
-    fprintf(fs,"%d:%d ",i,x[i]);
+    fprintf(fs,"%d:%d:%d:%d   ",(int)x[i].tid,(int)x[i].num_val,(int)x[i].num_nzcct,(int)x[i].offset);
   }
   fprintf(fs,")\n]\n");
   return HPCFMT_OK;
 }
+
+//TODO: merge tms_sparse_metrics_xxx with hpcrun_fmt_sparse_metrics_xxx
+int
+tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
+{
+  x->values = (hpcrun_metricVal_t *) malloc((x->num_vals)*sizeof(hpcrun_metricVal_t));
+  for (int i = 0; i < x->num_vals; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->values[i].bits), fs));
+  }
+
+  x->mid = (uint16_t *) malloc((x->num_vals)*sizeof(uint16_t));
+  for (int i = 0; i < x->num_vals; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int2_fread(&x->mid[i], fs));
+  }
+
+  x->cct_id = (uint32_t *) malloc((x->num_nz_cct)*sizeof(uint32_t));
+  x->cct_off = (uint64_t *) malloc((x->num_nz_cct)*sizeof(uint64_t));
+  for (int i = 0; i < x->num_nz_cct; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int4_fread(&x->cct_id[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->cct_off[i], fs));
+  }
+
+  return HPCFMT_OK;
+}
+
+
+int
+tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
+          const metric_tbl_t* metricTbl, const char* pre)
+{
+
+  fprintf(fs, "[\n%s(values: ", pre);
+  for (uint i = 0; i < x->num_vals; ++i) {
+    hpcrun_metricFlags_t mflags = hpcrun_metricFlags_NULL;
+    if (metricTbl) {
+      int metric_id = x->mid[i];
+      const metric_desc_t* mdesc = &(metricTbl->lst[metric_id]);
+      mflags = mdesc->flags;
+    }
+
+    switch (mflags.fields.valFmt) {
+      default: //used for printing tmp sparse-db files, it does not have metric_tbl included
+        fprintf(fs, " %g", x->values[i].r);
+	      break;
+      case MetricFlags_ValFmt_Int:
+	      fprintf(fs, " %"PRIu64, x->values[i].i);
+      	break;
+      case MetricFlags_ValFmt_Real:
+	      fprintf(fs, " %g", x->values[i].r);
+	      break;
+    }
+
+    if (i + 1 < x->num_vals) {
+      fprintf(fs, " ");
+    }
+  }
+  fprintf(fs, ")\n");
+
+  fprintf(fs, "%s(metric id: ",pre);
+  for (uint i = 0; i < x->num_vals; ++i) {
+    fprintf(fs, "%d", x->mid[i]);
+    if (i + 1 < x->num_vals) {
+      fprintf(fs, " ");
+    }
+  }
+  fprintf(fs, ")\n");
+
+  fprintf(fs,"%s(cct offsets (cct id : offset): ",pre);
+  for (uint i = 0; i < x->num_nz_cct; i++) {
+    fprintf(fs, "%d:%d", x->cct_id[i], x->cct_off[i]);
+    if (i + 1 < x->num_nz_cct) {
+      fprintf(fs, " ");
+    }
+  }
+  fprintf(fs, ")\n");
+
+  fprintf(fs, "]\n");
+
+  return HPCFMT_OK;
+}
+
 
 //***************************************************************************
 

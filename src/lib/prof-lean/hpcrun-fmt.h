@@ -135,11 +135,11 @@ static const int SF_END     = 0;
 static const int SF_FAIL    = 1;
 static const int SF_ERR     = -1;
 
-// -------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------
 // Format of footer: array with size 7, each is 8 bytes
 // hdr_offset  loadmap_offset  num_cct  cct_offset  metric-tbl_offset  sparse-metrics_offset  footer_offset
 //     0             1            2         3               4                  5                      6     
-// -------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------
 static const int SF_FOOTER_SIZE           = 56; 
 static const int SF_FOOTER_hdr            = 0; 
 static const int SF_FOOTER_lm             = 1; 
@@ -661,7 +661,11 @@ extern int
 hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 			   const metric_tbl_t* metricTbl, const char* pre);
 
-
+extern int
+tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+extern int
+tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
+          const metric_tbl_t* metricTbl, const char* pre);
 
 // --------------------------------------------------------------------------
 // hpcrun_sparse_file
@@ -685,9 +689,15 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
 // --------------------------------------------------------------------------
 // thread_major_sparse.db helper
 // --------------------------------------------------------------------------
-int tms_thread_offset_fwrite(uint32_t num_t,uint64_t* x, FILE* fs);
-uint64_t* tms_thread_offset_fread(uint32_t* num_t,FILE* fs);
-void tms_thread_offset_fprint(uint32_t num_t,uint64_t* x, FILE* fs);
+typedef struct tms_profile_info_t{
+  uint32_t tid;
+  uint64_t num_val;
+  uint32_t num_nzcct;
+  uint64_t offset;
+}tms_profile_info_t;
+int tms_profile_info_fwrite(uint32_t num_t,tms_profile_info_t* x, FILE* fs);
+int tms_profile_info_fread(tms_profile_info_t** x, uint32_t* num_t,FILE* fs);
+void tms_profile_info_fprint(uint32_t num_t,tms_profile_info_t* x, FILE* fs);
 
 // --------------------------------------------------------------------------
 //

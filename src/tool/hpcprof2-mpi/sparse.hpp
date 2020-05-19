@@ -85,7 +85,7 @@ public:
 
   //YUMENG
   struct ProfileInfo{
-    //uint32_t tid;
+    uint32_t tid;
     uint64_t num_val;
     uint32_t num_nzcct;
     uint64_t offset;
@@ -95,9 +95,9 @@ public:
   struct DataBlock{
     uint16_t mid;
     uint32_t num_values; // can be set at the end, used as offset for mid
-    std::vector<hpcrun_metricVal_t> values;
-    std::vector<uint32_t> tids;
+    std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
   };
+
 
   struct CCTDataPair{
     uint32_t cct_id;
@@ -114,6 +114,12 @@ public:
   const int TMS_prof_offset_SIZE  = 8;
   const int TMS_prof_skip_SIZE    = TMS_tid_SIZE + TMS_num_val_SIZE + TMS_num_nzcct_SIZE; 
   const int TMS_prof_info_SIZE    = TMS_tid_SIZE + TMS_num_val_SIZE + TMS_num_nzcct_SIZE + TMS_prof_offset_SIZE;
+
+  const int TMS_cct_id_SIZE       = 4;
+  const int TMS_cct_offset_SIZE   = 8;
+  const int TMS_cct_pair_SIZE     = TMS_cct_id_SIZE + TMS_cct_offset_SIZE;
+  const int TMS_val_SIZE          = 8;
+  const int TMS_mid_SIZE          = 2;
 
   uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
   uint32_t getTotalNumProfiles(uint32_t my_num_prof);
@@ -136,6 +142,8 @@ public:
   //***************************************************************************
   // cct_major_sparse.db  - YUMENG
   //***************************************************************************
+
+
   void getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_sizes,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
@@ -150,8 +158,8 @@ public:
   int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
-  void readOneProfile(std::vector<uint32_t>& cct_ids,
-    std::vector<CCTDataPair>& cct_data_pairs,MPI_File fh,MPI_Offset offset);
+  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
+    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh,MPI_Offset offset);
   void merge(int);
   void exscan(std::vector<uint64_t>& data,int threads); 
 

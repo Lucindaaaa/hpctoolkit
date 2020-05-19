@@ -413,7 +413,7 @@ void SparseDB::getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_size
 
 }
 
-//input: final sizes for all cct, output: my(rank) own responsible cct list
+//input: final offsets for all cct, output: my(rank) own responsible cct list
 void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
     std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank)
 {
@@ -432,12 +432,6 @@ void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
 
   
 }
-
-/*TODO: 大概念: pre calc how many bytes in total, 
-read_at once, interpret; + open giant thread_major_file fseek
-根据cct offsets get val and mid
-merge after get all tid data pair for one cct
-*/
 
 void SparseDB::readAsByte4(uint32_t *val, MPI_File fh, MPI_Offset off){
   uint32_t v = 0;
@@ -512,24 +506,23 @@ void SparseDB::interpretByte8(uint64_t *val, char *input){
 void SparseDB::readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
     MPI_File fh,MPI_Offset off){
     
-    int count = cct_offsets.size() * 12; //each cct has a 4-byte cct id and 8-byte cct offset
+    int count = cct_offsets.size() * TMS_cct_pair_SIZE; //each cct has a 4-byte cct id and 8-byte cct offset
     char input[count];
 
     MPI_Status stat;
     MPI_File_read_at(fh,off,&input,count,MPI_BYTE,&stat);
 
-    for(int i = 0; i<count; i += 12){
+    for(int i = 0; i<count; i += TMS_cct_pair_SIZE){
       uint32_t cct_id;
       uint64_t cct_off;
       interpretByte4(&cct_id, &input[i]);
-      interpretByte8(&cct_off, &input[i+4]);
+      interpretByte8(&cct_off, &input[i+TMS_cct_id_SIZE]);
       cct_offsets.emplace_back(cct_id, cct_off);
     }
     
 }
 
-//given full cct offsets and a group of cct ids, return a vector of <cct id, offset>
-//my_cct_offsets size == cct_ids size
+//given full cct offsets and a group of cct ids, return a vector of <cct id, offset> with nzcct
 int SparseDB::binarySearchCCTid(std::vector<uint32_t>& cct_ids,
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets)
@@ -576,68 +569,88 @@ int SparseDB::binarySearchCCTid(std::vector<uint32_t>& cct_ids,
   return 1;
 }
 
-
-void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids,
-    std::vector<CCTDataPair>& cct_data_pairs,MPI_File fh,MPI_Offset offset)
+void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
+    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh,MPI_Offset offset)
 {
   //offset:beginning of the profile
   //cct_ids: the ccts it needs to read in for this round for this profile(ascending order)
 
-  //TODO: unify 一下 read bytes first then interpret
   //TODO: val and mid write together => one seek per cct group
-  //CONSIDER: 这一部分能不能只读一次记录在memory里
-  MPI_Status stat;
-  uint32_t tid;
-  uint64_t num_vals;
-  readAsByte4(&tid,fh,offset);
-  readAsByte8(&num_vals,fh,offset+4);
 
-  uint64_t cct_offsets_offset = offset+12+num_vals*10;
-  uint32_t num_nz_cct;
-  readAsByte4(&num_nz_cct,fh,cct_offsets_offset);
-
-  std::vector<std::pair<uint32_t,uint64_t>> cct_offsets (num_nz_cct);
-  readCCToffsets(cct_offsets,fh,cct_offsets_offset+4);
-
-  uint64_t val_offset = offset+12;
-  uint64_t mid_offset = val_offset + num_vals*8;
-  //END of CONSIDER
-
+  //find the corresponding cct and its offset in values and mids
+  MPI_Offset cct_offsets_offset = offset + prof_info.num_val * (TMS_val_SIZE + TMS_mid_SIZE);
+  std::vector<std::pair<uint32_t,uint64_t>> full_cct_offsets (prof_info.num_nzcct);
+  readCCToffsets(full_cct_offsets,fh,cct_offsets_offset);
   std::vector<std::pair<uint32_t,uint64_t>> my_cct_offsets;
-  binarySearchCCTid(cct_ids,cct_offsets,my_cct_offsets);
+  binarySearchCCTid(cct_ids,full_cct_offsets,my_cct_offsets);
 
-  uint64_t val_start_pos = val_offset + my_cct_offsets[0].second * 8;
-  uint64_t val_count = (my_cct_offsets[cct_ids.size()].second - my_cct_offsets[0].second)*8;
-  uint64_t mid_start_pos = mid_offset + my_cct_offsets[0].second * 2;
-  uint64_t mid_count = (my_cct_offsets[cct_ids.size()].second - my_cct_offsets[0].second)*2;
+  //read all values and metric ids for this group of cct at once
+  MPI_Offset val_start_pos = offset + my_cct_offsets[0].second * TMS_val_SIZE;
+  int val_count = (my_cct_offsets[my_cct_offsets.size()-1].second - my_cct_offsets[0].second) * TMS_val_SIZE;
+  MPI_Offset mid_start_pos = offset + prof_info.num_val * TMS_val_SIZE + my_cct_offsets[0].second * TMS_mid_SIZE;
+  int mid_count = (my_cct_offsets[my_cct_offsets.size()-1].second - my_cct_offsets[0].second) * TMS_mid_SIZE;
   char vinput[val_count];
   char minput[mid_count];
-
+  MPI_Status stat;
   MPI_File_read_at(fh,val_start_pos,&vinput,val_count,MPI_BYTE,&stat);
   MPI_File_read_at(fh,mid_start_pos,&minput,mid_count,MPI_BYTE,&stat);
 
-  /*
-  for(int i = 0; i<count; i += 10){
-    uint64_t val;
-    uint16_t mid;
-    interpretByte8(&val, &input[i]);
-    interpretByte2(&mid, &input[i+8]);
-  }
+  //for each cct, keep track of the values,metric ids, and thread ids
+  for(int c = 0; c<my_cct_offsets.size()-1; c++) 
+  {
+    uint32_t cct_id = my_cct_offsets[c].first;
+    uint64_t num_val_this_cct = my_cct_offsets[c+1].second - my_cct_offsets[c].second;
+    char* val_start_this_cct = vinput + (my_cct_offsets[c].second - my_cct_offsets[0].second) * TMS_val_SIZE;
+    char* mid_start_this_cct = minput + (my_cct_offsets[c].second - my_cct_offsets[0].second) * TMS_mid_SIZE;
+    for(int i = 0; i<num_val_this_cct; i++){
+      //get a pair of val and mid
+      uint64_t val;
+      interpretByte8(&val,val_start_this_cct);
+      uint16_t mid;
+      interpretByte2(&mid,mid_start_this_cct);
 
-  for(int i = 0,j=0; i<cct_ids.size(); i++){
-    if(cct_ids[i] == my_cct_offsets[j]){
-      //read values
-    }else{//current cct id does not exist in this profile
-      DataBlock data;
+      //store them
+      std::unordered_map<uint32_t,std::vector<DataBlock>>::const_iterator got = cct_data_pairs.find (cct_id);
+      if ( got == cct_data_pairs.end() ){
+        //this cct doesn't exist in cct_data_paris yet
+        
+        DataBlock data;
+        data.mid = mid;
+        std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
+        hpcrun_metricVal_t v;
+        v.r = val;
+        values_tids.emplace_back(v,prof_info.tid);
+        data.values_tids = values_tids;
+        std::vector<DataBlock> datas;
+        datas.emplace_back(data);
+        cct_data_pairs.emplace(cct_id,datas);
+      }else{
+        
+        std::vector<DataBlock> datas = got->second;
+        auto it = std::find_if(datas.begin(), datas.end(), 
+                       [mid] (const DataBlock& d) { 
+                          return d.mid == mid; 
+                       });
+
+
+        hpcrun_metricVal_t v;
+        v.r = val;
+        if(it != datas.end()){
+          it->values_tids.emplace_back(v,prof_info.tid);
+        }else{
+          DataBlock data;
+          data.mid = mid;
+          std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
+          values_tids.emplace_back(v,prof_info.tid);
+          data.values_tids = values_tids;
+          datas.emplace_back(data);
+        }
+      }
+
+      
     }
+
   }
-  */
-
-
-
-
-
-
 
 }
 

@@ -354,6 +354,28 @@ void SparseDB::writeThreadMajor(int threads, int world_rank, int world_size){
 
 //***************************************************************************
 // cct_major_sparse.db  - YUMENG
+//
+/*EXAMPLE
+[Number of CCTs] (*not printed in hpcproftt)
+[CCT informations (cct id : number of nonzero values : number of nonzero metric ids : offset)
+  (0:186:112:65258   1:136:74:98930   2:138:75:107934   3:136:74:6224   4:131:71:70016   5:148:85:91202   ...)
+]
+[
+  (values:  4.02057  4.02057  4.02057  3.98029  0.01816  0.00154  ...)
+  (thread id: 1 1 1 1 1 0 ...)
+  (metric_id offsets (metric id : offset): 1:0 7:1 9:2 21:3 23:4 25:5 ...)
+]
+...same [sparse metrics] for all rest ccts 
+*/
+//
+// SIZE CHART: data(size in bytes)
+// Number of ccts (4)
+// [Profile informations] 
+//    cct id (4) : number of nonzero values (8) : number of nonzero metric ids (2) : offset(8)
+// [sparse metrics] 
+//    non-zero values (8)
+//    thread IDs of non-zero values (4)
+//    metric id (2) : offset (8)
 //***************************************************************************
 void vSum ( uint64_t *, uint64_t *, int *, MPI_Datatype * );
  

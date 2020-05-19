@@ -178,29 +178,28 @@ void SparseDB::write() {};
 //***************************************************************************
 // thread_major_sparse.db  - YUMENG
 //
-// Format: data:size in bytes
-// [Threads offsets] Number of profiles:4 | Offsets for all profiles in order:8 * Number of profiles
-// [sparse metrics] 
-// ThreadID:4 | Number of non-zero values:8 | 
-// Non-zero values:8 * Number of non-zero values |
-// Metric IDs of non-zero values:2 * Number of non-zero value |
-// Number of CCTs that have non-zero values:4
-// Pair of CCT ID and corresponding offsets (index at values and metirc IDs):(4+8)*Number of CCTs that have non-zero values
-
 /*EXAMPLE
-[Threads offsets (thread id :offset8)
-  (0:28 1:2388 2:4520 )
+[Number of profiles] (*not printed in hpcproftt)
+[Profile informations (thread id : number of nonzero values : number of nonzero CCTs : offset)
+  (0:186:112:65258   1:136:74:98930   2:138:75:107934   3:136:74:6224   4:131:71:70016   5:148:85:91202   ...)
 ]
-[sparse metrics:
-  (thread ID4: 0)
-  (number of non-zero metrics8: 136)
-  (values8:  1.17864  1.17864  1.17864  1.17864  0.000413  0.000102  0.000102)
-  (metric id2: 0 1 0 1 1 1 1)
-  (number of nonzero CCT: )
-  (cct offsets (cct id : offset): 1:0 163:1 165:2 167:3 169:4 171:5 173:6)
+[
+  (values:  4.02057  4.02057  4.02057  3.98029  0.01816  0.00154  ...)
+  (metric id: 1 1 1 1 1 0 ...)
+  (cct offsets (cct id : offset): 1:0 7:1 9:2 21:3 23:4 25:5 ...)
 ]
-...same [sparse metrics] for thread 1 and 2
+...same [sparse metrics] for all rest threads 
 */
+//
+// SIZE CHART: data(size in bytes)
+// Number of profiles (4)
+// [Profile informations] 
+//    thread id (4) : number of nonzero values (8) : number of nonzero CCTs (4) : offset(8)
+// [sparse metrics] 
+//    non-zero values (8)
+//    Metric IDs of non-zero values (2)
+//    cct id (4) : offset (8)
+
 //***************************************************************************
 uint64_t SparseDB::getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes){
   uint64_t my_size = 0;

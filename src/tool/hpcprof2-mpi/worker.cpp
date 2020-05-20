@@ -117,6 +117,10 @@ int rankN(ProfArgs&& args, int world_rank, int world_size) {
     pipeline.run();
   }
 
+  // Nab the total number of Context from rank 0. Since by now we know.
+  std::size_t ctxcnt;
+  MPI_Bcast(&ctxcnt, 1, mpi_data<std::size_t>::type, 0, MPI_COMM_WORLD);
+
   // Fire off the second pipeline, integrating the new data from rank 0
   {
     // Most of the IDs can be pulled from the void, only the Context IDs
@@ -163,7 +167,7 @@ int rankN(ProfArgs&& args, int world_rank, int world_size) {
 
     ProfilePipeline pipeline(std::move(pipelineB2), args.threads);
     pipeline.run();
-    if(sdb) sdb->merge(args.threads, unpacker.ctxids);
+    if(sdb) sdb->merge(args.threads, ctxcnt);
   }
 
   return 0;

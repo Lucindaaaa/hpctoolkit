@@ -101,7 +101,7 @@ public:
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
     std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank);
-  void merge(int threads, const std::unordered_set<unsigned int>& ctxids);
+  void merge(int threads, std::size_t ctxcnt);
   void exscan(std::vector<uint64_t>& data,int threads);
 
 

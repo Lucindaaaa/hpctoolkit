@@ -284,6 +284,7 @@ void SparseDB::writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_of
 
     //write at specific place
     MPI_Status stat;
+    #pragma omp critical
     MPI_File_write_at(fh,my_prof_offset, bytes.data(), bytes.size(), MPI_BYTE, &stat);
   }
 
@@ -379,22 +380,16 @@ void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
 // general - YUMENG
 //***************************************************************************
 
-void SparseDB::merge(int threads, const std::unordered_set<unsigned int>& ctxids) {
+void SparseDB::merge(int threads, std::size_t ctxcnt) {
   int world_rank;
   int world_size;
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-  // Convert from the set into a sorted vector
-  std::vector<unsigned int> v_ctxids(ctxids.size());
-  v_ctxids.assign(ctxids.begin(), ctxids.end());
-  std::sort(v_ctxids.begin(), v_ctxids.end());
-
   {
     util::log::debug msg{false};  // Switch to true for CTX id printouts
-    msg << "CTXs (" << world_rank << ":" << outputs.size() << "):";
-    int cnt = 0;
-    for(const auto id: v_ctxids) msg << (cnt++ % 10 == 0 ? "\n  " : " ") << id;
+    msg << "CTXs (" << world_rank << ":" << outputs.size() << "): "
+        << ctxcnt;
   }
 
   writeThreadMajor(threads,world_rank,world_size);

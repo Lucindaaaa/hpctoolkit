@@ -162,6 +162,7 @@ Analysis::Raw::profileInfoOffsets_sorter(tms_profile_info_t const& lhs, tms_prof
     return lhs.offset< rhs.offset;
 }
 
+//YUMENG
 void
 Analysis::Raw::sortProfileInfo_onOffsets(tms_profile_info_t* x, uint32_t num_prof)
 {

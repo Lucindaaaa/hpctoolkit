@@ -121,6 +121,9 @@ public:
   const int TMS_val_SIZE          = 8;
   const int TMS_mid_SIZE          = 2;
 
+  #define CCTLOCALSIZESIDX(c) ((c-1)/2)
+  #define CCTID(c)            (c*2+1)
+
   uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
   uint32_t getTotalNumProfiles(uint32_t my_num_prof);
   uint64_t getMyOffset(uint64_t my_size,int rank);
@@ -128,27 +131,29 @@ public:
       std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
       uint32_t total_prof, uint64_t my_offset, int threads);
 
+  void collectCCTLocalSizes(uint64_t* cct_local_sizes, std::vector<char>& bytes);
   void writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
       std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
       MPI_File fh, uint32_t total_prof, int rank, int threads);
   void writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+    std::vector<uint64_t>& cct_local_sizes,
     std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
     std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
     MPI_File fh, int threads);
   void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
   void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
   void writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off);
-  void writeThreadMajor(int threads, int world_rank, int world_size);
+  void writeThreadMajor(int threads, int world_rank, int world_size, std::vector<uint64_t>& cct_local_sizes);
 
   //***************************************************************************
   // cct_major_sparse.db  - YUMENG
   //***************************************************************************
+  const int FIRST_CCT_ID   = 1;
 
-
-  void getCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_sizes,
+  void getCctOffset(std::vector<uint64_t>& cct_sizes,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
-    std::vector<uint32_t>& my_ccts,uint64_t last_cct_size, int num_ranks, int rank);
+    std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, int num_ranks, int rank);
   void readAsByte4(uint32_t *val, MPI_File fh, MPI_Offset off);
   void readAsByte8(uint64_t *val, MPI_File fh, MPI_Offset off);
   void interpretByte2(uint16_t *val, char *input);

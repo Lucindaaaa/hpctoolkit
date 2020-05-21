@@ -95,8 +95,6 @@ public:
     std::atomic<int> wave;
   };
 
-  std::unordered_set<unsigned int> ctxids;
-
 private:
   std::mutex ctxtree_m;
   std::unordered_map<Context*, std::unordered_set<Scope>> ctxseen;
@@ -134,8 +132,6 @@ public:
   private:
     IdUnpacker& shared;
   };
-
-  std::unordered_set<unsigned int> ctxids;
 
 private:
   std::vector<uint8_t> ctxtree;

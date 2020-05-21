@@ -166,8 +166,9 @@ public:
     std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
 
 
-  void merge(int,const std::unordered_set<unsigned int>&);
+  void merge(int threads, std::size_t ctxcnt);
   void exscan(std::vector<uint64_t>& data,int threads); 
+
 
 
 

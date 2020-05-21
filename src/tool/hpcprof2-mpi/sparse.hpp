@@ -160,8 +160,13 @@ public:
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
   void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
-    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh,MPI_Offset offset);
-  void merge(int);
+    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
+  void readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh);
+  void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
+    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
+
+
+  void merge(int,const std::unordered_set<unsigned int>&);
   void exscan(std::vector<uint64_t>& data,int threads); 
 
 

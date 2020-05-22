@@ -149,6 +149,14 @@ public:
   // cct_major_sparse.db  - YUMENG
   //***************************************************************************
   const int FIRST_CCT_ID   = 1;
+  const int NEED_NUM_VAL   = -1;
+
+  const int CMS_num_cct_SIZE      = 4;
+  const int CMS_cct_id_SIZE       = 4;
+  const int CMS_num_val_SIZE      = 8;
+  const int CMS_num_nzmid_SIZE    = 2;
+  const int CMS_cct_offset_SIZE   = 8;
+  const int CMS_cct_info_SIZE     = CMS_cct_id_SIZE + CMS_num_val_SIZE + CMS_num_nzmid_SIZE + CMS_cct_offset_SIZE;
 
   void getCctOffset(std::vector<uint64_t>& cct_sizes,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
@@ -159,16 +167,24 @@ public:
   void interpretByte2(uint16_t *val, char *input);
   void interpretByte4(uint32_t *val, char *input);
   void interpretByte8(uint64_t *val, char *input);
+  void convertToByte8(uint64_t val, char* bytes);
+  void convertToByte4(uint32_t val, char* bytes);
+  void convertToByte2(uint16_t val, char* bytes);
   void readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
     MPI_File fh,MPI_Offset off);
   int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
+  //void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,\
+    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
   void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
     std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
   void readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh);
+  void dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, 
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t> cct_ids,
+    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
   void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
-    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, MPI_File fh, MPI_File ofh);
 
 
   void merge(int threads, std::size_t ctxcnt);

@@ -573,7 +573,7 @@ int SparseDB::binarySearchCCTid(std::vector<uint32_t>& cct_ids,
       if(profile_cct_offsets[m].first == target){
         my_cct_offsets.emplace_back(target,profile_cct_offsets[m].second);
       }else if(profile_cct_offsets[m].first > target){
-        //my_cct_offsets.emplace_back(target,0);
+        //my_cct_offsets.emplace_back(target,profile_cct_offsets[m-1].second);
         m -= 1; //back to original since this might be next target
       }else{ //profile_cct_offsets[m].first < target, should not happen
         printf("ERROR: SparseDB::binarySearchCCTid(): cct id %d in a profile does not exist in the full cct list.\n", profile_cct_offsets[m].first );
@@ -598,11 +598,19 @@ int SparseDB::binarySearchCCTid(std::vector<uint32_t>& cct_ids,
 
     }    
   }
-  my_cct_offsets.emplace_back(profile_cct_offsets[m+1].first,profile_cct_offsets[m+1].second);
+
+  if(m == profile_cct_offsets.size()-1){
+    my_cct_offsets.emplace_back(NEED_NUM_VAL,NEED_NUM_VAL);
+  }else{
+    my_cct_offsets.emplace_back(profile_cct_offsets[m+1].first,profile_cct_offsets[m+1].second);
+  }
+  
 
   return 1;
 }
 
+//void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info, \
+    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh)
 void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
     std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh)
 {
@@ -620,6 +628,7 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_i
 
 
   //read all values and metric ids for this group of cct at once
+  if(my_cct_offsets[my_cct_offsets.size()-1].second == NEED_NUM_VAL) my_cct_offsets[my_cct_offsets.size()-1].second = prof_info.num_val;
   MPI_Offset val_start_pos = offset + my_cct_offsets[0].second * TMS_val_SIZE;
   int val_count = (my_cct_offsets[my_cct_offsets.size()-1].second - my_cct_offsets[0].second) * TMS_val_SIZE;
   MPI_Offset mid_start_pos = offset + prof_info.num_val * TMS_val_SIZE + my_cct_offsets[0].second * TMS_mid_SIZE;
@@ -646,6 +655,11 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_i
 
       //store them
       std::unordered_map<uint32_t,std::vector<DataBlock>>::iterator got = cct_data_pairs.find (cct_id);
+      //std::vector<std::pair<uint32_t,std::vector<DataBlock>>>::iterator got = std::find_if(cct_data_pairs.begin(), cct_data_pairs.end(), 
+      //                 [&cct_id] (const std::pair<uint32_t,std::vector<DataBlock>>& p) { 
+      //                    return p.first == cct_id; 
+      //                 });
+
       if ( got == cct_data_pairs.end() ){
         //this cct doesn't exist in cct_data_paris yet
         
@@ -659,7 +673,7 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_i
         cct_data_pairs.emplace(cct_id,datas);
       }else{
         //find the DataBlock with mid
-        std::vector<DataBlock> datas = got->second;
+        std::vector<DataBlock> datas = got->second; 
 
         std::vector<DataBlock>::iterator it = std::find_if(datas.begin(), datas.end(), 
                        [&mid] (const DataBlock& d) { 
@@ -709,16 +723,106 @@ void SparseDB::readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh)
   }
 }
 
-void SparseDB::rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
-    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh)
+void SparseDB::convertToByte8(uint64_t val, char* bytes){
+  int shift = 0, num_writes = 0;
+  //char input[8];
+
+  for (shift = 56; shift >= 0; shift -= 8) {
+    //input[num_writes] = (val >> shift) & 0xff;
+    bytes[num_writes] = (val >> shift) & 0xff;
+    num_writes++;
+  }
+
+  //*bytes = input;
+
+}
+
+void SparseDB::convertToByte4(uint32_t val, char* bytes){
+  int shift = 0, num_writes = 0;
+  //char input[4];
+
+  for (shift = 24; shift >= 0; shift -= 8) {
+    //input[num_writes] = (val >> shift) & 0xff;
+    bytes[num_writes] = (val >> shift) & 0xff;
+    num_writes++;
+  }
+
+  //*bytes = input;
+
+}
+
+void SparseDB::convertToByte2(uint16_t val, char* bytes){
+  int shift = 0, num_writes = 0;
+  //char input[2];
+
+  for (shift = 8; shift >= 0; shift -= 8) {
+    //input[num_writes] = (val >> shift) & 0xff;
+    bytes[num_writes] = (val >> shift) & 0xff;
+    num_writes++;
+  }
+
+  //*bytes = input;
+
+}
+
+
+void SparseDB::dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, 
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t> cct_ids,
+    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes)
 {
+  //NOTICE: info_bytes and metrics_bytes contain the data for the number of ccts in this group (cct_data_pairs)
+  for(int i = 0; i<cct_ids.size(); i++ ){
+    //INFO_BYTES
+    uint32_t cct_id = cct_ids[i];
+    uint64_t num_val = 0;
+    uint16_t num_nzmid = 0;
+    uint64_t offset = cct_off[CCTLOCALSIZESIDX(cct_id)].second; 
+    std::unordered_map<uint32_t,std::vector<DataBlock>>::iterator got = cct_data_pairs.find (cct_id);
+
+    if(got != cct_data_pairs.end()){ //cct_data_pairs has the cct_id
+      std::vector<DataBlock> datas = got->second;
+      num_nzmid = datas.size();
+      for(auto d:datas){
+        d.num_values = d.values_tids.size(); //set up for later use
+        num_val += d.num_values;
+      }
+    }
+
+    uint64_t pre = i * CMS_cct_info_SIZE;
+    convertToByte4(cct_id,info_bytes.data() + pre);
+    convertToByte8(num_val,info_bytes.data() + pre + CMS_cct_id_SIZE);
+    convertToByte2(num_nzmid,info_bytes.data() + pre + CMS_cct_id_SIZE + CMS_num_val_SIZE);
+    convertToByte8(offset,info_bytes.data() + pre + CMS_cct_id_SIZE + CMS_num_val_SIZE + CMS_num_nzmid_SIZE);
+  }
+}
+
+void SparseDB::rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, MPI_File fh, MPI_File ofh)
+{
+  std::unordered_map<uint32_t,std::vector<DataBlock>> cct_data_pairs;
+  //std::vector<std::pair<uint32_t,std::vector<DataBlock>>> cct_data_pairs;
+
   //read all profiles for this cct_ids group
   for(int i = 0; i < prof_info.size(); i++){
     ProfileInfo pi = prof_info[i];
     readOneProfile(cct_ids,pi,cct_data_pairs,fh);
   }
+/*
+  //find all empty cct_ids
+  //TRY FIND A BETTER WAY
+  int num_empty_cct = cct_ids.size() - cct_data_pairs.size();
+  std::vector<uint32_t> empty_ccts(num_empty_cct); 
+  if(num_empty_cct != 0){ 
+    uint32_t cur_cct[cct_data_pairs.size()];
+    for(int i =0; i<cct_data_pairs.size(); i++){
+      cur_cct[i] = cct_data_pairs[i].first;
+    }                 
+    std::sort (cur_cct,cur_cct+cct_data_pairs.size());   
+    std::set_difference (cct_ids.begin(), cct_ids.end(), cur_cct, cur_cct+cct_data_pairs.size(), empty_ccts.begin());
+  }
+ */ 
 
-  //TEST:for(const auto& tp: outputs.citerate()) {
+/*  //TEST:for(const auto& tp: outputs.citerate()) {
   for(auto cdp : cct_data_pairs){
     uint32_t cctid = cdp.first;
     std::cout << "cct id " << cctid << ":\n";
@@ -734,9 +838,21 @@ void SparseDB::rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<Profile
     std::cout << "\n";
     
   }
+*/
+  
 
-  //for each cct id and metric id, sort the value:thread id pair and finalize num_values
+  //TODO: for each cct id and metric id, sort the value:thread id pair and finalize num_values
   //write for this cct_ids group
+  //if(cct_data_pairs.size() != cct_ids.size()) printf("ERROR: cct_data_pairs.size %d is not equal to cct_ids.size %d, which means at least one cct is empty\n",cct_data_pairs.size(),cct_ids.size());
+  std::vector<char> info_bytes (CMS_cct_info_SIZE * cct_ids.size());
+  std::vector<char> metrics_bytes;
+  dataPairs2Bytes(cct_data_pairs,cct_off,cct_ids,info_bytes,metrics_bytes);
+
+  MPI_Offset info_off = CMS_num_cct_SIZE + CCTLOCALSIZESIDX(cct_ids[0]) * CMS_cct_info_SIZE;
+  MPI_Status stat;
+  MPI_File_write_at(ofh,info_off,info_bytes.data(),info_bytes.size(),MPI_BYTE,&stat);
+
+
 
 
 }
@@ -765,6 +881,31 @@ void SparseDB::merge(int threads, std::size_t ctxcnt) {
   getCctOffset(cct_local_sizes,cct_off,threads/world_size);
   uint64_t last_cct_size = cct_local_sizes[ctxcnt-1];
   getMyCCTs(cct_off,my_cct,last_cct_size,world_size, world_rank);
+
+  MPI_File thread_major_f;
+  MPI_File_open(MPI_COMM_WORLD, (dir / "thread_major_sparse.db").c_str(),
+                  MPI_MODE_RDONLY, MPI_INFO_NULL, &thread_major_f);
+  MPI_File cct_major_f;
+  MPI_File_open(MPI_COMM_WORLD, (dir / "cct_major_sparse.db").c_str(),
+                  MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &cct_major_f);
+  writeAsByte4(ctxcnt,cct_major_f,0);
+  
+  std::vector<ProfileInfo> prof_info;
+  readProfileInfo(prof_info,thread_major_f);
+ 
+  for(int i =0; i<my_cct.size(); i++){
+    std::vector<uint32_t> cct_ids;
+    cct_ids.emplace_back(my_cct[i]);
+    rwOneCCTgroup(cct_ids,prof_info,cct_off,thread_major_f,cct_major_f);
+  }
+
+  MPI_File_close(&thread_major_f);
+
+
+
+
+  
+
  
   
 
@@ -813,24 +954,7 @@ std::cout << "Rank " << world_rank << ": ";
   std::cout << "size I am responsible for : " << (cct_off[CCTLOCALSIZESIDX(my_cct[my_cct.size()-1])].second - cct_off[CCTLOCALSIZESIDX(my_cct[0])].second +last) <<"\n";
 
 
-  std::vector<std::pair<uint32_t, uint64_t>> cct_sizes (30);
-  for(int i =0;i<30;i++){
-    cct_sizes[i].first = i;
-    cct_sizes[i].second = i*10;
-  }
-
-  std::vector<std::pair<uint32_t, uint64_t>> cct_off (cct_sizes.size());
-  std::vector<uint32_t> my_cct;
-  getCctOffset(cct_sizes,cct_off,threads/world_size);
-  for(auto c :cct_off) std::cout << " " << c.second;
-  std::cout << "\n\n";
-  getMyCCTs(cct_off,my_cct,cct_sizes[cct_sizes.size()-1].second,world_size, world_rank);
-  std::cout << "Rank " << world_rank << ": ";
-  for(auto c :my_cct) std::cout << " " << c;
-  std::cout << "\n\n";
-
-  std::cout << "size I am responsible for : " << (cct_off[my_cct[my_cct.size()-1]].second - cct_off[my_cct[0]].second + cct_sizes[my_cct[my_cct.size()-1]].second) <<"\n";
-
+  
   //TEST for binarySearchCCTid
   std::vector<std::pair<uint32_t, uint64_t>> profile_cct_offsets (30);
   for(int i =0;i<30;i++){

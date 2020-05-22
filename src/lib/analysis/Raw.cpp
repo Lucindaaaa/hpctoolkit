@@ -105,8 +105,11 @@ Analysis::Raw::writeAsText(/*destination,*/ const char* filenm)
   else if (ty == ProfType_SparseDBtmp) { //YUMENG
     writeAsText_sparseDBtmp(filenm);
   }
-  else if (ty == ProfType_SparseDBthread){
+  else if (ty == ProfType_SparseDBthread){ //YUMENG
     writeAsText_sparseDBthread(filenm);
+  }
+  else if (ty == ProfType_SparseDBcct){ //YUMENG
+    writeAsText_sparseDBcct(filenm);
   }
   else {
     DIAG_Die(DIAG_Unimplemented);
@@ -207,6 +210,43 @@ Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
   }
 }
 
+//YUMENG
+void
+Analysis::Raw::writeAsText_sparseDBcct(const char* filenm)
+{
+  if (!filenm) { return; }
+
+  try {
+    FILE* fs = hpcio_fopen_r(filenm);
+    FILE* ofs = hpcio_fopen_w("readable_cct_major_sparse.db",1);
+    if (!fs) {
+      DIAG_Throw("error opening cct sparse file '" << filenm << "'");
+    }
+    uint32_t num_cct;
+    cms_cct_info_t* x;
+    cms_cct_info_fread(&x, &num_cct,fs);
+    cms_cct_info_fprint(num_cct,x,ofs);
+    //sortProfileInfo_onOffsets(x,num_prof);
+/*
+    for(int i = 0; i<num_prof; i++){
+      hpcrun_fmt_sparse_metrics_t sm;
+      sm.num_vals = x[i].num_val;
+      sm.num_nz_cct = x[i].num_nzcct;
+      int ret = tms_sparse_metrics_fread(&sm,fs);
+      if (ret != HPCFMT_OK) {
+        DIAG_Throw("error reading thread sparse file '" << filenm << "'");
+      }
+      tms_sparse_metrics_fprint(&sm,ofs,NULL, "  ");
+    }
+    */
+    hpcio_fclose(fs);
+    hpcio_fclose(ofs);
+  }
+  catch (...) {
+    DIAG_EMsg("While reading '" << filenm << "'...");
+    throw;
+  }
+}
 
 void
 Analysis::Raw::writeAsText_callpathMetricDB(const char* filenm)

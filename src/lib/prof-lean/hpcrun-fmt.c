@@ -1104,7 +1104,7 @@ tms_profile_info_fread(tms_profile_info_t** x, uint32_t* num_t,FILE* fs)
 void
 tms_profile_info_fprint(uint32_t num_t,tms_profile_info_t* x, FILE* fs)
 {
-  fprintf(fs,"[Profile informations (thread id : number of nonzero values : number of nonzero CCTs : offset)\n  (");
+  fprintf(fs,"[Profile informations for %d profiles (thread id : number of nonzero values : number of nonzero CCTs : offset)\n  (", num_t);
 
   for (int i = 0; i < num_t; ++i) {
     fprintf(fs,"%d:%d:%d:%d   ",(int)x[i].tid,(int)x[i].num_val,(int)x[i].num_nzcct,(int)x[i].offset);
@@ -1193,6 +1193,39 @@ tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
   return HPCFMT_OK;
 }
 
+
+//***************************************************************************
+// cct_major_sparse.db helper - YUMENG
+//***************************************************************************
+int
+cms_cct_info_fread(cms_cct_info_t** x, uint32_t* num_cct,FILE* fs)
+{
+  HPCFMT_ThrowIfError(hpcfmt_int4_fread(num_cct, fs));
+
+  cms_cct_info_t * cct_infos = (cms_cct_info_t *) malloc((*num_cct)*sizeof(cms_cct_info_t));
+
+  for (int i = 0; i < *num_cct; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(cct_infos[i].cct_id), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(cct_infos[i].num_val), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int2_fread(&(cct_infos[i].num_nzmid), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(cct_infos[i].offset), fs));
+  }
+
+  *x = cct_infos;
+  return HPCFMT_OK;
+}
+
+void
+cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs)
+{
+  fprintf(fs,"[CCT informations for %d CCTs (CCT id : number of nonzero values : number of nonzero metric ids : offset)\n  (", num_cct);
+
+  for (int i = 0; i < num_cct; ++i) {
+    fprintf(fs,"%d:%d:%d:%d   ",(int)x[i].cct_id,(int)x[i].num_val,(int)x[i].num_nzmid,(int)x[i].offset);
+  }
+  fprintf(fs,")\n]\n");
+  return HPCFMT_OK;
+}
 
 //***************************************************************************
 

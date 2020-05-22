@@ -661,12 +661,6 @@ extern int
 hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 			   const metric_tbl_t* metricTbl, const char* pre);
 
-extern int
-tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
-extern int
-tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
-          const metric_tbl_t* metricTbl, const char* pre);
-
 // --------------------------------------------------------------------------
 // hpcrun_sparse_file
 // --------------------------------------------------------------------------
@@ -695,9 +689,36 @@ typedef struct tms_profile_info_t{
   uint32_t num_nzcct;
   uint64_t offset;
 }tms_profile_info_t;
+
 int tms_profile_info_fwrite(uint32_t num_t,tms_profile_info_t* x, FILE* fs);
-int tms_profile_info_fread(tms_profile_info_t** x, uint32_t* num_t,FILE* fs);
-void tms_profile_info_fprint(uint32_t num_t,tms_profile_info_t* x, FILE* fs);
+int tms_profile_info_fread(tms_profile_info_t** x, uint32_t* num_prof,FILE* fs);
+void tms_profile_info_fprint(uint32_t num_prof,tms_profile_info_t* x, FILE* fs);
+extern int
+tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+extern int
+tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
+          const metric_tbl_t* metricTbl, const char* pre);
+
+
+// --------------------------------------------------------------------------
+// cct_major_sparse.db helper
+// --------------------------------------------------------------------------
+typedef struct cms_cct_info_t{
+  uint32_t cct_id;
+  uint64_t num_val;
+  uint16_t num_nzmid;
+  uint64_t offset;
+}cms_cct_info_t;
+
+int cms_cct_info_fread(cms_cct_info_t** x, uint32_t* num_cct,FILE* fs);
+void cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs);
+
+/*
+extern int
+cms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+extern int
+cms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
+          const metric_tbl_t* metricTbl, const char* pre);*/
 
 // --------------------------------------------------------------------------
 //

@@ -165,6 +165,8 @@ getProfileType(const std::string& filenm)
     ty = ProfType_SparseDBtmp;
   }else if(filenm.find("thread_major") != std::string::npos){ //YUMENG
     ty = ProfType_SparseDBthread;
+  }else if(filenm.find("cct_major") != std::string::npos){ //YUMENG
+    ty = ProfType_SparseDBcct;
   }
 
   

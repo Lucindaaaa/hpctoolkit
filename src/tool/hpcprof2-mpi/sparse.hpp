@@ -131,19 +131,19 @@ public:
       std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
       uint32_t total_prof, uint64_t my_offset, int threads);
 
-  void collectCCTLocalSizes(uint64_t* cct_local_sizes, std::vector<char>& bytes);
+  void collectCctMajorData(uint64_t* cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, std::vector<char>& bytes);
   void writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
       std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
       MPI_File fh, uint32_t total_prof, int rank, int threads);
   void writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
-    std::vector<uint64_t>& cct_local_sizes,
+    std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids,
     std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
     std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
     MPI_File fh, int threads);
   void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
   void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
   void writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off);
-  void writeThreadMajor(int threads, int world_rank, int world_size, std::vector<uint64_t>& cct_local_sizes);
+  void writeThreadMajor(int threads, int world_rank, int world_size, std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids);
 
   //***************************************************************************
   // cct_major_sparse.db  - YUMENG
@@ -157,6 +157,13 @@ public:
   const int CMS_num_nzmid_SIZE    = 2;
   const int CMS_cct_offset_SIZE   = 8;
   const int CMS_cct_info_SIZE     = CMS_cct_id_SIZE + CMS_num_val_SIZE + CMS_num_nzmid_SIZE + CMS_cct_offset_SIZE;
+
+  const int CMS_mid_SIZE          = 2;
+  const int CMS_m_offset_SIZE     = 8;
+  const int CMS_m_pair_SIZE       = CMS_mid_SIZE + CMS_m_offset_SIZE;
+  const int CMS_val_SIZE          = 8;
+  const int CMS_tid_SIZE          = 4;
+  const int CMS_val_tid_pair_SIZE = CMS_val_SIZE + CMS_tid_SIZE;
 
   void getCctOffset(std::vector<uint64_t>& cct_sizes,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);

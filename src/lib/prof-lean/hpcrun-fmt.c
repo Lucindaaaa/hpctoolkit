@@ -1227,6 +1227,52 @@ cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs)
   return HPCFMT_OK;
 }
 
+int
+cms_sparse_metrics_fread(cct_sparse_metrics_t* x, FILE* fs)
+{
+  x->values = (hpcrun_metricVal_t *) malloc((x->num_vals)*sizeof(hpcrun_metricVal_t));
+  x->tids   = (uint32_t *) malloc((x->num_vals)*sizeof(uint32_t));
+  for (int i = 0; i < x->num_vals; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->values[i].bits), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(x->tids[i]), fs));
+  }
+
+  x->mids      = (uint16_t *) malloc((x->num_nzmid)*sizeof(uint16_t));
+  x->m_offsets = (uint64_t *) malloc((x->num_nzmid)*sizeof(uint64_t));
+  for (int i = 0; i < x->num_nzmid; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int2_fread(&x->mids[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->m_offsets[i], fs));
+  }
+
+  return HPCFMT_OK;
+
+}
+int
+cms_sparse_metrics_fprint(cct_sparse_metrics_t* x, FILE* fs, const char* pre)
+{
+  fprintf(fs, "[\n%s(value:threadID)  : ", pre);
+  for (uint i = 0; i < x->num_vals; ++i) {
+    fprintf(fs, "%g:%d", x->values[i].r, x->tids[i]); //cct_major_sparse doesn't have metricTbl, so all print as real value for development
+    if (i + 1 < x->num_vals) {
+      fprintf(fs, " ");
+    }
+  }
+  fprintf(fs, "\n");
+
+  fprintf(fs, "%s(metricID:offset) : ",pre);
+  for (uint i = 0; i < x->num_nzmid; ++i) {
+    fprintf(fs, "%d:%d", x->mids[i],x->m_offsets[i]);
+    if (i + 1 < x->num_nzmid) {
+      fprintf(fs, " ");
+    }
+  }
+  fprintf(fs, "\n");
+
+  fprintf(fs, "]\n");
+
+  return HPCFMT_OK;
+}
+
 //***************************************************************************
 
 int

@@ -226,19 +226,21 @@ Analysis::Raw::writeAsText_sparseDBcct(const char* filenm)
     cms_cct_info_t* x;
     cms_cct_info_fread(&x, &num_cct,fs);
     cms_cct_info_fprint(num_cct,x,ofs);
-    //sortProfileInfo_onOffsets(x,num_prof);
-/*
-    for(int i = 0; i<num_prof; i++){
-      hpcrun_fmt_sparse_metrics_t sm;
-      sm.num_vals = x[i].num_val;
-      sm.num_nz_cct = x[i].num_nzcct;
-      int ret = tms_sparse_metrics_fread(&sm,fs);
-      if (ret != HPCFMT_OK) {
-        DIAG_Throw("error reading thread sparse file '" << filenm << "'");
+
+    for(int i = 0; i<num_cct; i++){
+      if(x[i].num_val != 0){
+        cct_sparse_metrics_t csm;
+        csm.num_vals = x[i].num_val;
+        csm.num_nzmid = x[i].num_nzmid;
+        int ret = cms_sparse_metrics_fread(&csm,fs);
+        if (ret != HPCFMT_OK) {
+          DIAG_Throw("error reading cct sparse file '" << filenm << "'");
+        }
+        cms_sparse_metrics_fprint(&csm,ofs, "  ");
       }
-      tms_sparse_metrics_fprint(&sm,ofs,NULL, "  ");
+      
     }
-    */
+   
     hpcio_fclose(fs);
     hpcio_fclose(ofs);
   }

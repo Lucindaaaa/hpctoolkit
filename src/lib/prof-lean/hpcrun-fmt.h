@@ -713,12 +713,20 @@ typedef struct cms_cct_info_t{
 int cms_cct_info_fread(cms_cct_info_t** x, uint32_t* num_cct,FILE* fs);
 void cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs);
 
-/*
+typedef struct cct_sparse_metrics_t{
+  uint64_t num_vals;
+  uint16_t num_nzmid;
+  hpcrun_metricVal_t* values;
+  uint32_t* tids; 
+  uint16_t* mids;
+  uint64_t* m_offsets;
+}cct_sparse_metrics_t;
+
 extern int
-cms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+cms_sparse_metrics_fread(cct_sparse_metrics_t* x, FILE* fs);
 extern int
-cms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
-          const metric_tbl_t* metricTbl, const char* pre);*/
+cms_sparse_metrics_fprint(cct_sparse_metrics_t* x, FILE* fs,
+          const char* pre);
 
 // --------------------------------------------------------------------------
 //

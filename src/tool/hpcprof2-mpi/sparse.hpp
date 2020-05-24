@@ -165,10 +165,12 @@ public:
   const int CMS_tid_SIZE          = 4;
   const int CMS_val_tid_pair_SIZE = CMS_val_SIZE + CMS_tid_SIZE;
 
-  void getCctOffset(std::vector<uint64_t>& cct_sizes,
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads);
+  void unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc);
+  void getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::set<uint16_t>> cct_nzmids,
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads, int rank);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
-    std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, int num_ranks, int rank);
+    std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, uint64_t& total_size, int num_ranks, int rank);
+  void updateCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,uint64_t& total_size, size_t ctxcnt, int threads);
   void readAsByte4(uint32_t *val, MPI_File fh, MPI_Offset off);
   void readAsByte8(uint64_t *val, MPI_File fh, MPI_Offset off);
   void interpretByte2(uint16_t *val, char *input);
@@ -191,11 +193,12 @@ public:
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t> cct_ids,
     std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
   void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, MPI_File fh, MPI_File ofh);
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size,  MPI_File fh, MPI_File ofh);
 
 
   void merge(int threads, std::size_t ctxcnt);
-  void exscan(std::vector<uint64_t>& data,int threads); 
+  template<typename T>
+  void exscan(std::vector<T>& data,int threads); 
 
 
 

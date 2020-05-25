@@ -628,6 +628,20 @@ hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
 			   epoch_flags_t flags,const char* pre);
 #endif
 
+// --------------------------------------------------------------------------
+//
+// --------------------------------------------------------------------------
+
+extern int
+hpcrun_fmt_lip_fread(lush_lip_t* x, FILE* fs);
+
+extern int
+hpcrun_fmt_lip_fwrite(lush_lip_t* x, FILE* fs);
+
+extern int
+hpcrun_fmt_lip_fprint(lush_lip_t* x, FILE* fs, const char* pre);
+
+
 //***************************************************************************
 // sparse metrics - YUMENG
 //***************************************************************************
@@ -681,7 +695,7 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
 
 
 // --------------------------------------------------------------------------
-// thread_major_sparse.db helper
+// thread_major_sparse.db hpcproftt helper
 // --------------------------------------------------------------------------
 typedef struct tms_profile_info_t{
   uint32_t tid;
@@ -693,15 +707,14 @@ typedef struct tms_profile_info_t{
 int tms_profile_info_fwrite(uint32_t num_t,tms_profile_info_t* x, FILE* fs);
 int tms_profile_info_fread(tms_profile_info_t** x, uint32_t* num_prof,FILE* fs);
 void tms_profile_info_fprint(uint32_t num_prof,tms_profile_info_t* x, FILE* fs);
-extern int
-tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
-extern int
-tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
+
+int tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs);
+int tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
           const metric_tbl_t* metricTbl, const char* pre);
 
 
 // --------------------------------------------------------------------------
-// cct_major_sparse.db helper
+// cct_major_sparse.db hpcproftt helper
 // --------------------------------------------------------------------------
 typedef struct cms_cct_info_t{
   uint32_t cct_id;
@@ -709,9 +722,6 @@ typedef struct cms_cct_info_t{
   uint16_t num_nzmid;
   uint64_t offset;
 }cms_cct_info_t;
-
-int cms_cct_info_fread(cms_cct_info_t** x, uint32_t* num_cct,FILE* fs);
-void cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs);
 
 typedef struct cct_sparse_metrics_t{
   uint64_t num_vals;
@@ -722,24 +732,13 @@ typedef struct cct_sparse_metrics_t{
   uint64_t* m_offsets;
 }cct_sparse_metrics_t;
 
-extern int
-cms_sparse_metrics_fread(cct_sparse_metrics_t* x, FILE* fs);
-extern int
-cms_sparse_metrics_fprint(cct_sparse_metrics_t* x, FILE* fs,
+int cms_cct_info_fread(cms_cct_info_t** x, uint32_t* num_cct,FILE* fs);
+void cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs);
+
+int cms_sparse_metrics_fread(cct_sparse_metrics_t* x, FILE* fs);
+int cms_sparse_metrics_fprint(cct_sparse_metrics_t* x, FILE* fs,
           const char* pre);
 
-// --------------------------------------------------------------------------
-//
-// --------------------------------------------------------------------------
-
-extern int
-hpcrun_fmt_lip_fread(lush_lip_t* x, FILE* fs);
-
-extern int
-hpcrun_fmt_lip_fwrite(lush_lip_t* x, FILE* fs);
-
-extern int
-hpcrun_fmt_lip_fprint(lush_lip_t* x, FILE* fs, const char* pre);
 
 
 //***************************************************************************

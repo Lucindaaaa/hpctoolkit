@@ -100,7 +100,7 @@ void
 writeAsText_sparseDBthread(const char* filenm); //YUMENG
 
 void
-writeAsText_sparseDBcct(const char* filenm);
+writeAsText_sparseDBcct(const char* filenm); //YUMENG
 
 void
 writeAsText_callpathMetricDB(/*destination,*/ const char* filenm);

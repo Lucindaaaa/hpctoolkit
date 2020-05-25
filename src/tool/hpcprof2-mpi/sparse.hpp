@@ -83,27 +83,6 @@ public:
   void notifyWavefront(hpctoolkit::DataClass::singleton_t) noexcept override;
   void notifyThreadFinal(const hpctoolkit::Thread::Temporary&) override;
 
-  //YUMENG
-  struct ProfileInfo{
-    uint32_t tid;
-    uint64_t num_val;
-    uint32_t num_nzcct;
-    uint64_t offset;
-  };
-
-  //TODO: change names... these are bad...
-  struct DataBlock{
-    uint16_t mid;
-    uint32_t num_values; // can be set at the end, used as offset for mid
-    std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
-  };
-
-
-  struct CCTDataPair{
-    uint32_t cct_id;
-    DataBlock* data;
-  };
-
   //***************************************************************************
   // thread_major_sparse.db  - YUMENG
   //***************************************************************************
@@ -121,28 +100,6 @@ public:
   const int TMS_val_SIZE          = 8;
   const int TMS_mid_SIZE          = 2;
 
-  #define CCTLOCALSIZESIDX(c) ((c-1)/2)
-  #define CCTID(c)            (c*2+1)
-
-  uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
-  uint32_t getTotalNumProfiles(uint32_t my_num_prof);
-  uint64_t getMyOffset(uint64_t my_size,int rank);
-  void getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
-      std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
-      uint32_t total_prof, uint64_t my_offset, int threads);
-
-  void collectCctMajorData(uint64_t* cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, std::vector<char>& bytes);
-  void writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
-      std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
-      MPI_File fh, uint32_t total_prof, int rank, int threads);
-  void writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
-    std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids,
-    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
-    std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
-    MPI_File fh, int threads);
-  void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
-  void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
-  void writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off);
   void writeThreadMajor(int threads, int world_rank, int world_size, std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids);
 
   //***************************************************************************
@@ -165,41 +122,34 @@ public:
   const int CMS_tid_SIZE          = 4;
   const int CMS_val_tid_pair_SIZE = CMS_val_SIZE + CMS_tid_SIZE;
 
-  void unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc);
-  void getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::set<uint16_t>> cct_nzmids,
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads, int rank);
-  void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
-    std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, uint64_t& total_size, int num_ranks, int rank);
-  void updateCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,uint64_t& total_size, size_t ctxcnt, int threads);
+  void writeCCTMajor(std::vector<uint64_t>& cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids,
+    int ctxcnt, int world_rank, int world_size, int threads);
+
+  //***************************************************************************
+  // General  - YUMENG
+  //***************************************************************************
+  #define CCTLOCALSIZESIDX(c) ((c-1)/2)
+  #define CCTID(c)            (c*2+1)
+  
+  void merge(int threads, std::size_t ctxcnt);
+  template<typename T>
+  void exscan(std::vector<T>& data,int threads); 
+
+
+  //***************************************************************************
+  // Work with bytes  - YUMENG
+  //***************************************************************************
+  void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
+  void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
+  void writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off);
   void readAsByte4(uint32_t *val, MPI_File fh, MPI_Offset off);
   void readAsByte8(uint64_t *val, MPI_File fh, MPI_Offset off);
   void interpretByte2(uint16_t *val, char *input);
   void interpretByte4(uint32_t *val, char *input);
   void interpretByte8(uint64_t *val, char *input);
-  void convertToByte8(uint64_t val, char* bytes);
-  void convertToByte4(uint32_t val, char* bytes);
   void convertToByte2(uint16_t val, char* bytes);
-  void readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
-    MPI_File fh,MPI_Offset off);
-  int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
-    std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
-    std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
-  //void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,\
-    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
-  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
-    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
-  void readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh);
-  void dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, 
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t> cct_ids,
-    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
-  void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size,  MPI_File fh, MPI_File ofh);
-
-
-  void merge(int threads, std::size_t ctxcnt);
-  template<typename T>
-  void exscan(std::vector<T>& data,int threads); 
-
+  void convertToByte4(uint32_t val, char* bytes);
+  void convertToByte8(uint64_t val, char* bytes);
 
 
 
@@ -217,6 +167,74 @@ private:
   hpctoolkit::util::locked_unordered_map<const hpctoolkit::Thread*,
     hpctoolkit::stdshim::filesystem::path> outputs;
   std::atomic<std::size_t> outputCnt;
+
+
+  //***************************************************************************
+  // thread_major_sparse.db  - YUMENG
+  //***************************************************************************
+  uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
+  uint32_t getTotalNumProfiles(uint32_t my_num_prof);
+  uint64_t getMyOffset(uint64_t my_size,int rank);
+  void getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
+      std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
+      uint32_t total_prof, uint64_t my_offset, int threads);
+
+  void collectCctMajorData(uint64_t* cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, std::vector<char>& bytes);
+  void writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+      std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
+      MPI_File fh, uint32_t total_prof, int rank, int threads);
+  void writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+    std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids,
+    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
+    std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
+    MPI_File fh, int threads);
+
+
+  //***************************************************************************
+  // cct_major_sparse.db  - YUMENG
+  //***************************************************************************
+  struct ProfileInfo{
+    uint32_t tid;
+    uint64_t num_val;
+    uint32_t num_nzcct;
+    uint64_t offset;
+  };
+
+  //TODO: change names... these are bad...
+  struct DataBlock{
+    uint16_t mid;
+    uint32_t num_values; // can be set at the end, used as offset for mid
+    std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
+  };
+
+  struct CCTDataPair{
+    uint32_t cct_id;
+    DataBlock* data;
+  };
+
+
+  void unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc);
+  void getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::set<uint16_t>> cct_nzmids,
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads, int rank);
+  void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
+    std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, uint64_t& total_size, int num_ranks, int rank);
+  void updateCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,uint64_t& total_size, size_t ctxcnt, int threads);
+  
+  void readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
+    MPI_File fh,MPI_Offset off);
+  int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
+    std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
+    std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
+  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
+    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
+  void readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh);
+  void dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, 
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t> cct_ids,
+    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
+  void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size,  MPI_File fh, MPI_File ofh);
+
+
 };
 
 

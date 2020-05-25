@@ -751,16 +751,63 @@ hpcrun_fmt_cct_node_fprint(hpcrun_fmt_cct_node_t* x, FILE* fs,
   return HPCFMT_OK;
 }
 
+//***************************************************************************
+
+int
+hpcrun_fmt_lip_fread(lush_lip_t* x, FILE* fs)
+{
+  for (int i = 0; i < LUSH_LIP_DATA8_SZ; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->data8[i], fs));
+  }
+
+  return HPCFMT_OK;
+}
+
+
+int
+hpcrun_fmt_lip_fwrite(lush_lip_t* x, FILE* fs)
+{
+  for (int i = 0; i < LUSH_LIP_DATA8_SZ; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->data8[i], fs));
+  }
+
+  return HPCFMT_OK;
+}
+
+
+int
+hpcrun_fmt_lip_fprint(lush_lip_t* x, FILE* fs, const char* pre)
+{
+  char lip_str[LUSH_LIP_STR_MIN_LEN];
+  lush_lip_sprintf(lip_str, x);
+
+  fprintf(fs, "%s(lip: %s)", pre, lip_str);
+
+  return HPCFMT_OK;
+}
 
 //***************************************************************************
 // sparse metircs - YUMENG
 // 
-// Format: (meaning of the data : number of bytes)
-// Thread ID:4 | Number of non-zero values:8 | 
-// Non-zero values:8 * Number of non-zero values |
-// Metric IDs of non-zero values:2 * Number of non-zero value |
-// Number of CCTs that have non-zero values:4
-// Pair of CCT ID and corresponding offsets (index at values and metirc IDs):(4+8)*Number of CCTs that have non-zero values
+/* EXAMPLE
+[sparse metrics:
+  (thread ID: 14)
+  (number of non-zero metrics: 60)
+  (number of non-zero CCTs : WRITTEN BUT NOT PRINTED in hpcproftt)
+  (values:  0.000204  0.000206  0.000103  0.000715  ...)
+  (metric id: 0 0 0 0 ...)
+  (cct offsets (cct id : offset): 400:0 366:1 324:2 344:3 ...)
+]
+*/
+//
+// SIZE CHART: data(size in bytes)
+// Thread ID                 (4) 
+// Number of non-zero values (8) 
+// Number of non-zero CCTs   (4)
+// Value                     (8)
+// Metric ID                 (2)
+// CCT ID                    (4) 
+// CCT Offset                (8)
 //***************************************************************************
 
  int
@@ -883,6 +930,8 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 
   return HPCFMT_OK;
 }
+
+//TODO: need free function
 
 //***************************************************************************
 // hpcrun_sparse_file - YUMENG
@@ -1067,7 +1116,7 @@ int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t
 
 
 //***************************************************************************
-// thread_major_sparse.db helper - YUMENG
+// thread_major_sparse.db hpcproftt helper - YUMENG
 //***************************************************************************
 int
 tms_profile_info_fwrite(uint32_t num_t,tms_profile_info_t* x, FILE* fs)
@@ -1113,7 +1162,6 @@ tms_profile_info_fprint(uint32_t num_t,tms_profile_info_t* x, FILE* fs)
   return HPCFMT_OK;
 }
 
-//TODO: merge tms_sparse_metrics_xxx with hpcrun_fmt_sparse_metrics_xxx
 int
 tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
 {
@@ -1193,9 +1241,10 @@ tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
   return HPCFMT_OK;
 }
 
+//TODO: need free function
 
 //***************************************************************************
-// cct_major_sparse.db helper - YUMENG
+// cct_major_sparse.db hpcproftt helper - YUMENG
 //***************************************************************************
 int
 cms_cct_info_fread(cms_cct_info_t** x, uint32_t* num_cct,FILE* fs)
@@ -1273,40 +1322,9 @@ cms_sparse_metrics_fprint(cct_sparse_metrics_t* x, FILE* fs, const char* pre)
   return HPCFMT_OK;
 }
 
-//***************************************************************************
-
-int
-hpcrun_fmt_lip_fread(lush_lip_t* x, FILE* fs)
-{
-  for (int i = 0; i < LUSH_LIP_DATA8_SZ; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->data8[i], fs));
-  }
-
-  return HPCFMT_OK;
-}
+//TODO: need free functions for each
 
 
-int
-hpcrun_fmt_lip_fwrite(lush_lip_t* x, FILE* fs)
-{
-  for (int i = 0; i < LUSH_LIP_DATA8_SZ; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->data8[i], fs));
-  }
-
-  return HPCFMT_OK;
-}
-
-
-int
-hpcrun_fmt_lip_fprint(lush_lip_t* x, FILE* fs, const char* pre)
-{
-  char lip_str[LUSH_LIP_STR_MIN_LEN];
-  lush_lip_sprintf(lip_str, x);
-
-  fprintf(fs, "%s(lip: %s)", pre, lip_str);
-
-  return HPCFMT_OK;
-}
 
 
 //***************************************************************************

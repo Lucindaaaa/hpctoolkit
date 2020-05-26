@@ -314,8 +314,7 @@ void SparseDB::convertToByte8(uint64_t val, char* bytes){
 // thread_major_sparse.db  - YUMENG
 //
 /*EXAMPLE
-[Number of profiles] (WRITTEN BUT NOT PRINTED in hpcproftt)
-[Profile informations (thread id : number of nonzero values : number of nonzero CCTs : offset)
+[Profile informations for 72 profiles (thread id : number of nonzero values : number of nonzero CCTs : offset)
   (0:186:112:65258   1:136:74:98930   2:138:75:107934   3:136:74:6224   4:131:71:70016   5:148:85:91202   ...)
 ]
 [
@@ -535,14 +534,11 @@ void SparseDB::writeThreadMajor(const int threads, const int world_rank, const i
 // cct_major_sparse.db  - YUMENG
 //
 /*EXAMPLE
-[Number of CCTs] (WRITTEN BUT NOT PRINTED in hpcproftt)
-[CCT informations (cct id : number of nonzero values : number of nonzero metric ids : offset)
-  (0:186:112:65258   1:136:74:98930   2:138:75:107934   3:136:74:6224   4:131:71:70016   5:148:85:91202   ...)
-]
+[CCT informations for 232 CCTs (CCT id : number of nonzero values : number of nonzero metric ids : offset)
+  (1:72:1:5108   3:71:1:5982   5:71:1:6844   7:70:1:7706   ...)
 [
-  (values:  4.02057  4.02057  4.02057  3.98029  0.01816  0.00154  ...)
-  (thread id: 1 1 1 1 1 0 ...)
-  (metric_id offsets (metric id : offset): 1:0 7:1 9:2 21:3 23:4 25:5 ...)
+  (value:threadID)  : 3.01672:0 3.03196:1 3.02261:2 3.00047:3 ...
+  (metricID:offset) : 1:0
 ]
 ...same [sparse metrics] for all rest ccts 
 */

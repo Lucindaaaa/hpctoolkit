@@ -100,13 +100,13 @@ public:
   const int TMS_val_SIZE          = 8;
   const int TMS_mid_SIZE          = 2;
 
-  void writeThreadMajor(int threads, int world_rank, int world_size, std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids);
+  void writeThreadMajor(const int threads, const int world_rank, const int world_size, std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids);
 
   //***************************************************************************
   // cct_major_sparse.db  - YUMENG
   //***************************************************************************
-  const int FIRST_CCT_ID   = 1;
-  const int NEED_NUM_VAL   = -1;
+  const int FIRST_CCT_ID          = 1;
+  const int NEED_NUM_VAL          = -1;
 
   const int CMS_num_cct_SIZE      = 4;
   const int CMS_cct_id_SIZE       = 4;
@@ -128,8 +128,8 @@ public:
   //***************************************************************************
   // General  - YUMENG
   //***************************************************************************
-  #define CCTLOCALSIZESIDX(c) ((c-1)/2)
-  #define CCTID(c)            (c*2+1)
+  #define CCTIDX(c) ((c-1)/2)
+  #define CCTID(c)  (c*2+1)
   
   void merge(int threads, std::size_t ctxcnt);
   template<typename T>
@@ -142,11 +142,11 @@ public:
   void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
   void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
   void writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off);
-  void readAsByte4(uint32_t *val, MPI_File fh, MPI_Offset off);
-  void readAsByte8(uint64_t *val, MPI_File fh, MPI_Offset off);
-  void interpretByte2(uint16_t *val, char *input);
-  void interpretByte4(uint32_t *val, char *input);
-  void interpretByte8(uint64_t *val, char *input);
+  void readAsByte4(uint32_t& val, MPI_File fh, MPI_Offset off);
+  void readAsByte8(uint64_t& val, MPI_File fh, MPI_Offset off);
+  void interpretByte2(uint16_t& val, const char *input);
+  void interpretByte4(uint32_t& val, const char *input);
+  void interpretByte8(uint64_t& val, const char *input);
   void convertToByte2(uint16_t val, char* bytes);
   void convertToByte4(uint32_t val, char* bytes);
   void convertToByte8(uint64_t val, char* bytes);
@@ -172,22 +172,22 @@ private:
   //***************************************************************************
   // thread_major_sparse.db  - YUMENG
   //***************************************************************************
-  uint64_t getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes);
-  uint32_t getTotalNumProfiles(uint32_t my_num_prof);
-  uint64_t getMyOffset(uint64_t my_size,int rank);
+  void getProfileSizes(std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes, uint64_t& my_size);
+  void getTotalNumProfiles(const uint32_t my_num_prof, uint32_t& total_prof);
+  void getMyOffset(const uint64_t my_size, uint64_t& my_off, const int rank);
   void getMyProfOffset(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets,
-      std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
-      uint32_t total_prof, uint64_t my_offset, int threads);
+      const std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
+      const uint32_t total_prof, const uint64_t my_offset, const int threads);
 
-  void collectCctMajorData(uint64_t* cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, std::vector<char>& bytes);
-  void writeProfInfo(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+  void collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, const std::vector<char>& bytes);
+  void writeProfInfo(const std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
       std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
-      MPI_File fh, uint32_t total_prof, int rank, int threads);
-  void writeProfiles(std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+      const MPI_File fh, const uint32_t total_prof, const int rank, const int threads);
+  void writeProfiles(const std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
     std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids,
-    std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
+    const std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
     std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
-    MPI_File fh, int threads);
+    const MPI_File fh, const int threads);
 
 
   //***************************************************************************
@@ -207,14 +207,9 @@ private:
     std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
   };
 
-  struct CCTDataPair{
-    uint32_t cct_id;
-    DataBlock* data;
-  };
-
 
   void unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc);
-  void getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::set<uint16_t>> cct_nzmids,
+  void getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::set<uint16_t>>& cct_nzmids,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads, int rank);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
     std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, uint64_t& total_size, int num_ranks, int rank);
@@ -225,11 +220,11 @@ private:
   int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
-  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo prof_info,
+  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info,
     std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
   void readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh);
   void dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, 
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t> cct_ids,
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t>& cct_ids,
     std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
   void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size,  MPI_File fh, MPI_File ofh);

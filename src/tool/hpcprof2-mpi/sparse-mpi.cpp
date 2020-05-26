@@ -69,17 +69,6 @@ void SparseDB::merge0(int threads, MPI_File& outfile, const std::vector<std::pai
     //ss << "Thread [" << attr.mpirank() << "," << attr.threadid() << "] "
     //   << "written in " << in.second.string() << "\n";
 
-    /*
-    omp_set_num_threads(threads);
-    #pragma omp parallel
-    {
-       int num = omp_get_num_threads();
-      int tid = omp_get_thread_num();
-      printf("I am %d thread in %d\n", tid, num);
-    }
-    */
-
- 
     //YUMENG
     struct stat buf;
     stat(in.second.string().c_str(),&buf);

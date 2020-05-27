@@ -791,11 +791,11 @@ hpcrun_fmt_lip_fprint(lush_lip_t* x, FILE* fs, const char* pre)
 // 
 /* EXAMPLE
 [sparse metrics:
-  (thread ID: 14)
-  (number of non-zero metrics: 60)
-  (number of non-zero CCTs : WRITTEN BUT NOT PRINTED in hpcproftt)
-  (values:  0.000204  0.000206  0.000103  0.000715  ...)
-  (metric id: 0 0 0 0 ...)
+  (thread ID                    : 14)
+  (number of non-zero metrics   : 60)
+  (number of non-zero CCTs      : WRITTEN BUT NOT PRINTED in hpcproftt)
+  (values                       : 0.000204  0.000206  0.000103  0.000715  ...)
+  (metric id                    : 0 0 0 0 ...)
   (cct offsets (cct id : offset): 400:0 366:1 324:2 344:3 ...)
 ]
 */

@@ -106,7 +106,7 @@ public:
   // cct_major_sparse.db  - YUMENG
   //***************************************************************************
   const int FIRST_CCT_ID          = 1;
-  const int NEED_NUM_VAL          = -1;
+  const uint NEED_NUM_VAL         = -1;
 
   const int CMS_num_cct_SIZE      = 4;
   const int CMS_cct_id_SIZE       = 4;
@@ -141,7 +141,7 @@ public:
   //***************************************************************************
   void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
   void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
-  void writeAsByteX(std::vector<char> val, size_t size, MPI_File fh, MPI_Offset off);
+  void writeAsByteX(std::vector<char>& val, size_t size, MPI_File fh, MPI_Offset off);
   void readAsByte4(uint32_t& val, MPI_File fh, MPI_Offset off);
   void readAsByte8(uint64_t& val, MPI_File fh, MPI_Offset off);
   void interpretByte2(uint16_t& val, const char *input);
@@ -168,6 +168,11 @@ private:
     hpctoolkit::stdshim::filesystem::path> outputs;
   std::atomic<std::size_t> outputCnt;
 
+  //***************************************************************************
+  // general - YUMENG
+  //***************************************************************************
+  void throwIfError(int result, int succeed, std::string string);
+
 
   //***************************************************************************
   // thread_major_sparse.db  - YUMENG
@@ -180,13 +185,9 @@ private:
       const uint32_t total_prof, const uint64_t my_offset, const int threads);
 
   void collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, const std::vector<char>& bytes);
-  void writeProfInfo(const std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
-      std::unordered_map<uint32_t,std::vector<char>>& prof_infos,
-      const MPI_File fh, const uint32_t total_prof, const int rank, const int threads);
   void writeProfiles(const std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
     std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids,
     const std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
-    std::unordered_map<uint32_t,std::vector<char>>& prof_infos, 
     const MPI_File fh, const int threads);
 
 
@@ -228,7 +229,6 @@ private:
     std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
   void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size,  MPI_File fh, MPI_File ofh);
-
 
 };
 

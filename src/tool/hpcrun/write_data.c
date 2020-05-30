@@ -289,6 +289,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
       
       hpcrun_fmt_loadmapEntry_fwrite(&lm_entry, fs);
     }
+
     //YUMENG: set footer  
     if(footer) footer[SF_FOOTER_cct] = ftell(fs);
     
@@ -309,8 +310,6 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
   //initialize the sparse_metrics
     sparse_metrics_t sparse_metrics;
     sparse_metrics.tid = cptd->id;
-    sparse_metrics.num_vals = 0;
-    sparse_metrics.num_cct = 0;
 
   //assign value while writing cct info
     int ret = hpcrun_cct_bundle_fwrite(fs, epoch_flags, cct, cptd->cct2metrics_map, &sparse_metrics);
@@ -364,25 +363,24 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
 
     
     hpcrun_sparse_metrics.values = sparse_metrics.values;
-    hpcrun_sparse_metrics.mid = (uint16_t *) hpcrun_malloc(sparse_metrics.num_vals * sizeof(uint16_t));
-    hpcrun_sparse_metrics.m_offset = (uint64_t *) hpcrun_malloc(sparse_metrics.num_vals * sizeof(uint64_t));
-    //hpcrun_sparse_metrics.cct_offsets = sparse_metrics.cct_offsets;
+    hpcrun_sparse_metrics.mid = sparse_metrics.mids;
+
     hpcrun_sparse_metrics.cct_id = sparse_metrics.cct_id;
     hpcrun_sparse_metrics.cct_off = sparse_metrics.cct_off;
     hpcrun_sparse_metrics.num_nz_cct = sparse_metrics.num_nz_cct;
-    for(int i = 0; i<sparse_metrics.num_vals; i++){
-      hpcrun_sparse_metrics.mid[i] = sparse_metrics.metric_pos[i].mid;
-      hpcrun_sparse_metrics.m_offset[i] = sparse_metrics.metric_pos[i].offset;
-    }
+
 
     hpcrun_fmt_sparse_metrics_fwrite(&hpcrun_sparse_metrics,fs);
     if(footer) footer[SF_FOOTER_footer] = ftell(fs);
+
+
+    
 
     //
     // == footer == YUMENG
     //
     if(s->next == NULL){
-      for(int i = 0; i<7; i++){
+      for(int i = 0; i < SF_FOOTER_LENGTH; i++){
         hpcfmt_int8_fwrite(footer[i],fs);
       }
     }

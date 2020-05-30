@@ -1152,7 +1152,8 @@ void SparseDB::exscan(std::vector<T>& data, int threads) {
 void SparseDB::throwIfError(int result, int succeed, std::string string)
 {
   if(result != succeed){
-    std::cerr << "ERROR " << result << " in " << string << std::endl;
+    util::log::fatal() << "ERROR " << result << " in " << string << std::endl;
+    //std::cerr << "ERROR " << result << " in " << string << std::endl;
     //MPI_Finalize();
     //exit(-1);
   }

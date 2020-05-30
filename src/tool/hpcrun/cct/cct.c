@@ -250,6 +250,7 @@ typedef struct {
   //YUMENG: help count number of non-zero values for each cct
   cct2metrics_t* cct2metrics_map;
   uint64_t num_nzval;
+  uint32_t num_nzcct;
 } count_arg_t;
 
 static void
@@ -265,7 +266,7 @@ l_count(cct_node_t* n, cct_op_arg_t arg, size_t level)
     hpcrun_get_metric_data_list_specific(&(count_arg->cct2metrics_map), n);
   uint64_t num_nzval = hpcrun_metric_sparse_count(data_list);
   (count_arg->num_nzval) += num_nzval;
-
+  if(num_nzval != 0) (count_arg->num_nzcct)++; 
   (count_arg->n)++;
 }
 
@@ -415,16 +416,15 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
     hpcrun_get_metric_data_list_specific(&(my_arg->cct2metrics_map), node);
 
   //set_sparse_copy: copy the values into sparse_metrics
-  size_t curr_num_cct = sparse_metrics->num_cct;
-  uint64_t curr_cct_offset = (sparse_metrics->cct_offsets)[curr_num_cct];
-  uint64_t num_nzval = hpcrun_metric_set_sparse_copy(sparse_metrics->values,sparse_metrics->metric_pos, data_list,curr_cct_offset);
+  uint64_t curr_cct_offset = sparse_metrics->cur_cct_offset; 
+  uint64_t num_nzval = hpcrun_metric_set_sparse_copy(sparse_metrics->values, sparse_metrics->mids, data_list, curr_cct_offset);
   if(num_nzval != 0){
     (sparse_metrics->cct_id)[sparse_metrics->num_nz_cct] = tmp->id;
     (sparse_metrics->cct_off)[sparse_metrics->num_nz_cct] = curr_cct_offset;
     (sparse_metrics->num_nz_cct)++;
   }
-  (sparse_metrics->cct_offsets)[curr_num_cct + 1] = curr_cct_offset + num_nzval;
-  (sparse_metrics->num_cct)++;
+  sparse_metrics->cur_cct_offset += num_nzval;
+
   tmp->num_metrics = 0;
 #elif 0
   // keren's code
@@ -824,21 +824,21 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
 {
   if (!fs) return HPCRUN_ERR;
 
-  //YUMENG: count number of nodes & number of non-zero values per node
+  //YUMENG: count number of nodes & number of non-zero values for all nodes
   size_t nodes = 0;
   uint64_t num_nzval = 0;
+  uint32_t num_nzcct = 0;
   if (HPCRUN_CCT_KEEP_DUMMY) {
-    nodes = hpcrun_cct_num_nodes(cct, true, &cct2metrics_map,&num_nzval);
+    nodes = hpcrun_cct_num_nodes(cct, true, &cct2metrics_map, &num_nzval, &num_nzcct);
   } else {
-    nodes = hpcrun_cct_num_nodes(cct, false, &cct2metrics_map,&num_nzval);
+    nodes = hpcrun_cct_num_nodes(cct, false, &cct2metrics_map, &num_nzval, &num_nzcct);
   }
+  sparse_metrics->num_cct = nodes;
 
-  //YUMENG: initialize cct_offsets, last offset will be the total number of values
-  sparse_metrics->cct_offsets = (uint64_t *) hpcrun_malloc((nodes+1)*sizeof(uint64_t));
-  (sparse_metrics->cct_offsets)[0] = 0;
-  //YUMENG:temp code to record cct_id:cct_off pair
-  sparse_metrics->cct_off = (uint64_t *) hpcrun_malloc((nodes)*sizeof(uint64_t));
-  sparse_metrics->cct_id = (uint32_t *) hpcrun_malloc((nodes)*sizeof(uint32_t));
+  //YUMENG: record cct_id:cct_off pair
+  sparse_metrics->cur_cct_offset = 0;
+  sparse_metrics->cct_off = (uint64_t *) hpcrun_malloc((num_nzcct)*sizeof(uint64_t));
+  sparse_metrics->cct_id = (uint32_t *) hpcrun_malloc((num_nzcct)*sizeof(uint32_t));
   sparse_metrics->num_nz_cct = 0;
 
   hpcfmt_int8_fwrite((uint64_t) nodes, fs);
@@ -866,9 +866,8 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
 #endif
 
   sparse_metrics->num_vals = num_nzval;
-  sparse_metrics->values = (cct_metric_data_t *) hpcrun_malloc((sparse_metrics->num_vals)*sizeof(cct_metric_data_t));
-  sparse_metrics->metric_pos = (metric_position_t *) hpcrun_malloc((sparse_metrics->num_vals)*sizeof(metric_position_t));
-
+  sparse_metrics->values = (cct_metric_data_t *) hpcrun_malloc(num_nzval * sizeof(cct_metric_data_t));
+  sparse_metrics->mids = (uint16_t *) hpcrun_malloc(num_nzval * sizeof(uint16_t));
 
   write_arg_t write_arg = {
     .num_kind_metrics = num_kind_metrics,
@@ -898,8 +897,8 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
 
 #if 1
 //YUMENG
-  if(sparse_metrics->num_cct != nodes)printf("\nTEST: number of nodes are not equal if printed. \n");
-  if(sparse_metrics->num_vals != (sparse_metrics->cct_offsets)[nodes])printf("\nTEST: number of nzvals are not equal if printed. \n");
+//numnzcct should equal
+  if(sparse_metrics->cur_cct_offset != sparse_metrics->num_vals) printf("\nTEST: number of nzvals and cur_cct_off set are not equal if printed. \n");
 #endif
 
   return HPCRUN_OK;
@@ -909,7 +908,7 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
 // Utilities
 //
 size_t
-hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy, cct2metrics_t **cct2metrics_map,uint64_t* num_nzval)
+hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy, cct2metrics_t **cct2metrics_map,uint64_t* num_nzval, uint32_t* num_nzcct)
 {
   count_arg_t count_arg = {
     .count_dummy = count_dummy,
@@ -917,11 +916,13 @@ hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy, cct2metrics_t **cct2metr
 
     //YUMENG: count number of non-zero values
     .cct2metrics_map = *cct2metrics_map,
-    .num_nzval = *num_nzval
+    .num_nzval = *num_nzval,
+    .num_nzcct = *num_nzcct
   };
   hpcrun_cct_walk_node_1st(cct, l_count, &count_arg);
   *cct2metrics_map = count_arg.cct2metrics_map;
   *num_nzval = count_arg.num_nzval;
+  *num_nzcct = count_arg.num_nzcct;
   return count_arg.n;
 }
 

@@ -123,12 +123,13 @@ typedef cct_node_t* cct_node_id_t;
 //YUMENG
 struct sparse_metrics_t{
   int tid;
-  uint64_t num_vals;
   size_t num_cct;
+  uint64_t num_vals;
   cct_metric_data_t* values;
-  metric_position_t* metric_pos;
-  uint64_t *cct_offsets;
+  uint16_t* mids;
   
+  uint64_t cur_cct_offset;
+
   //to get (cct id: cct_offset) pair, need to clean the design a little bit afterwards
   uint32_t *cct_id;
   uint64_t *cct_off;
@@ -300,7 +301,8 @@ int hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map,
 #if 0
 extern size_t hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy);
 #else
-extern size_t hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy,cct2metrics_t **cct2metrics_map,uint64_t* num_nzval);
+extern size_t hpcrun_cct_num_nodes(cct_node_t* cct, bool count_dummy,\
+    cct2metrics_t **cct2metrics_map,uint64_t* num_nzval, uint32_t* num_nzcct);
 #endif
 //
 // look up addr in the set of cct's children

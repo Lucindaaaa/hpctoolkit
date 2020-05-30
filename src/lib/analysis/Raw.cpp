@@ -199,7 +199,10 @@ Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
         DIAG_Throw("error reading thread sparse file '" << filenm << "'");
       }
       tms_sparse_metrics_fprint(&sm,ofs,NULL, "  ");
+      tms_sparse_metrics_free(&sm);
     }
+
+    tms_profile_info_free(&x);
     
     hpcio_fclose(fs);
     hpcio_fclose(ofs);
@@ -237,9 +240,12 @@ Analysis::Raw::writeAsText_sparseDBcct(const char* filenm)
           DIAG_Throw("error reading cct sparse file '" << filenm << "'");
         }
         cms_sparse_metrics_fprint(&csm,ofs, "  ");
+        cms_sparse_metrics_free(&csm);
       }
       
     }
+
+    cms_cct_info_free(&x);
    
     hpcio_fclose(fs);
     hpcio_fclose(ofs);

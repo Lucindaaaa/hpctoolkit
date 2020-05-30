@@ -624,8 +624,9 @@ hpcrun_metric_sparse_count(metric_data_list_t* list)
 
 }
 
+
 int
-hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, metric_position_t* metric_pos,
+hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, uint16_t* metric_ids,
 			     metric_data_list_t* list, int initializing_offset)
 {
   
@@ -633,7 +634,7 @@ hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, metric_position_t* metric_
   metric_data_list_t *curr;
   
   cct_metric_data_t curr_m;
-  metric_position_t position;
+
   int curr_id = 0;//global id of metrics
   int num_nzval = 0;//current number of non-zero values
 
@@ -645,10 +646,7 @@ hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, metric_position_t* metric_
         curr_m = actual[i].v1;
         if(curr_m.i != 0){ 
           val[initializing_offset+num_nzval] = curr_m;
-          //right now, for each thread, metric offset only differs 1 with each other
-          position.mid =(uint16_t)curr_id;
-          position.offset = (uint64_t)(num_nzval+initializing_offset);
-          metric_pos[initializing_offset+num_nzval] = position;
+          metric_ids[initializing_offset + num_nzval] = (uint16_t)curr_id;
           num_nzval++;
         }
         curr_id++;

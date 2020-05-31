@@ -104,64 +104,6 @@ static const char HPCPROF_MetricDBSfx[] = "metric-db";
 static const char HPCPROF_TmpFnmSfx[] = "tmp";
 
 //***************************************************************************
-//YUMENG
-typedef struct hpcrun_sparse_file {
-  FILE* file;
-  size_t footer[7];
-
-  //use for Pause, Resume
-  bool mode;
-  size_t cur_pos;
-
-  //keep track for next_xx functions
-  uint32_t cur_cct;
-  size_t cur_metric;
-  uint16_t cur_metric_id; //count the id, metric desc doesn't have it
-  size_t cur_lm;
-  uint32_t cur_block;
-
-  //to read metric values for current block, initialized when hpcrun_sparse_next_block is called
-  size_t cur_block_end;
-  uint64_t num_nzval;
-  size_t metric_pos_offset;
-  size_t cct_offset_offset;
-  size_t val_offset;
-  uint32_t num_nz_cct;
-
-} hpcrun_sparse_file_t;
-
-static const int SF_SUCCEED = 0;
-static const int SF_END     = 0;
-static const int SF_FAIL    = 1;
-static const int SF_ERR     = -1;
-
-// --------------------------------------------------------------------------------------------------------------
-// Format of footer: array with size 7, each is 8 bytes
-// hdr_offset  loadmap_offset  num_cct  cct_offset  metric-tbl_offset  sparse-metrics_offset  footer_offset
-//     0             1            2         3               4                  5                      6     
-// --------------------------------------------------------------------------------------------------------------
-static const int SF_FOOTER_SIZE           = 56; 
-static const int SF_FOOTER_LENGTH         = 7; 
-static const int SF_FOOTER_hdr            = 0; 
-static const int SF_FOOTER_lm             = 1; 
-static const int SF_FOOTER_num_cct        = 2; 
-static const int SF_FOOTER_cct            = 3; 
-static const int SF_FOOTER_metric_tbl     = 4; 
-static const int SF_FOOTER_sparse_metrics = 5; 
-static const int SF_FOOTER_footer         = 6; 
-
-static const int SF_num_lm_SIZE           = 4; 
-static const int SF_num_metric_SIZE       = 4;
-static const int SF_num_cct_SIZE          = 8;
-static const int SF_cct_node_SIZE         = 18; // id:4 id-parent:4 lm-id:2 im-ip:8
-static const int SF_tid_SIZE              = 4;
-static const int SF_num_val_SIZE          = 8;
-static const int SF_val_SIZE              = 8;
-static const int SF_mid_SIZE              = 2;
-static const int SF_num_nz_cct_SIZE       = 4;
-static const int SF_cct_id_SIZE           = 4;
-static const int SF_cct_off_SIZE          = 8;
-//***************************************************************************
 
 //***************************************************************************
 // hdr
@@ -655,7 +597,9 @@ struct hpcrun_fmt_sparse_metrics_t{
   uint64_t num_vals;
   uint64_t num_cct;
   hpcrun_metricVal_t* values;
-  uint16_t* mid;
+  uint16_t* mids;
+
+  uint64_t cur_cct_offset;
 
   //cct_id : cct_off pair
   uint32_t *cct_id;
@@ -683,6 +627,65 @@ hpcrun_fmt_sparse_metrics_free(hpcrun_fmt_sparse_metrics_t* x, hpcfmt_free_fn de
 // --------------------------------------------------------------------------
 #define OPENED 0
 #define PAUSED 1
+
+static const int SF_SUCCEED = 0;
+static const int SF_END     = 0;
+static const int SF_FAIL    = 1;
+static const int SF_ERR     = -1;
+
+// ------------------------------------------------------------
+// Format of footer: array with size 7, each is 8 bytes
+//    hdr_offset       loadmap_offset      num_cct  cct_offset 
+//        0                  1                 2         3      
+// metric-tbl_offset  sparse-metrics_offset  footer_offset
+//        4                  5                      6     
+// ------------------------------------------------------------
+static const int SF_FOOTER_SIZE           = 56; 
+static const int SF_FOOTER_LENGTH         = 7; 
+static const int SF_FOOTER_hdr            = 0; 
+static const int SF_FOOTER_lm             = 1; 
+static const int SF_FOOTER_num_cct        = 2; 
+static const int SF_FOOTER_cct            = 3; 
+static const int SF_FOOTER_metric_tbl     = 4; 
+static const int SF_FOOTER_sparse_metrics = 5; 
+static const int SF_FOOTER_footer         = 6; 
+
+static const int SF_num_lm_SIZE           = 4; 
+static const int SF_num_metric_SIZE       = 4;
+static const int SF_num_cct_SIZE          = 8;
+static const int SF_cct_node_SIZE         = 18; // id:4 id-parent:4 lm-id:2 im-ip:8
+static const int SF_tid_SIZE              = 4;
+static const int SF_num_val_SIZE          = 8;
+static const int SF_val_SIZE              = 8;
+static const int SF_mid_SIZE              = 2;
+static const int SF_num_nz_cct_SIZE       = 4;
+static const int SF_cct_id_SIZE           = 4;
+static const int SF_cct_off_SIZE          = 8;
+
+typedef struct hpcrun_sparse_file {
+  FILE* file;
+  size_t footer[7];
+
+  //use for Pause, Resume
+  bool mode;
+  size_t cur_pos;
+
+  //keep track for next_xx functions
+  uint32_t cur_cct;
+  size_t cur_metric;
+  uint16_t cur_metric_id; //count the id, metric desc doesn't have it
+  size_t cur_lm;
+  uint32_t cur_block;
+
+  //to read metric values for current block, initialized when hpcrun_sparse_next_block is called
+  size_t cur_block_end;
+  uint64_t num_nzval;
+  size_t metric_pos_offset;
+  size_t cct_offset_offset;
+  size_t val_offset;
+  uint32_t num_nz_cct;
+
+} hpcrun_sparse_file_t;
 
 hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path);
 int hpcrun_sparse_pause(hpcrun_sparse_file_t* sparse_fs);
@@ -737,7 +740,7 @@ typedef struct cct_sparse_metrics_t{
 }cct_sparse_metrics_t;
 
 int cms_cct_info_fread(cms_cct_info_t** x, uint32_t* num_cct,FILE* fs);
-void cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs);
+int cms_cct_info_fprint(uint32_t num_cct,cms_cct_info_t* x, FILE* fs);
 void cms_cct_info_free(cms_cct_info_t** x);
 
 int cms_sparse_metrics_fread(cct_sparse_metrics_t* x, FILE* fs);

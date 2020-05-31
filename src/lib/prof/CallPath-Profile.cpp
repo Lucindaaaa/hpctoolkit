@@ -1042,11 +1042,11 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ------------------------------------------------------------
   // footer - YUMENG
   // ------------------------------------------------------------
-  size_t footer[7];
+  size_t footer[SF_FOOTER_LENGTH];
   fseek(infs, 0, SEEK_END); 
   size_t footer_position = ftell(infs) - SF_FOOTER_SIZE;
   fseek(infs, footer_position, SEEK_SET); 
-  for(int i = 0; i<7; i++){
+  for(int i = 0; i < SF_FOOTER_LENGTH; i++){
     hpcfmt_int8_fread(&(footer[i]), infs);
   }
   fseek(infs, footer[SF_FOOTER_hdr], SEEK_SET); 
@@ -1111,8 +1111,8 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
    file_cur = ftell(infs);
    if((file_cur == footer[SF_FOOTER_footer]) && outfs){
      fprintf(outfs,"[footer: \n  ");
-     for(int i = 0; i<7;i++){
-       fprintf(outfs,"%d ",footer[i]);
+     for(int i = 0; i < SF_FOOTER_LENGTH;i++){
+       fprintf(outfs,"%ld ",footer[i]);
      }
      fprintf(outfs,"\n]\n");
    }

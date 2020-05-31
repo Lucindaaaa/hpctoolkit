@@ -151,6 +151,7 @@ Analysis::Raw::writeAsText_sparseDBtmp(const char* filenm)
       DIAG_Throw("error reading tmp sparse-db file '" << filenm << "'");
     }
     hpcrun_fmt_sparse_metrics_fprint(&sm,stdout,NULL, "  ");
+    hpcrun_fmt_sparse_metrics_free(&sm, free);
     hpcio_fclose(fs);
   }
   catch (...) {
@@ -190,7 +191,7 @@ Analysis::Raw::writeAsText_sparseDBthread(const char* filenm)
     tms_profile_info_fprint(num_prof,x,ofs);
     sortProfileInfo_onOffsets(x,num_prof);
 
-    for(int i = 0; i<num_prof; i++){
+    for(uint i = 0; i<num_prof; i++){
       hpcrun_fmt_sparse_metrics_t sm;
       sm.num_vals = x[i].num_val;
       sm.num_nz_cct = x[i].num_nzcct;
@@ -230,7 +231,7 @@ Analysis::Raw::writeAsText_sparseDBcct(const char* filenm)
     cms_cct_info_fread(&x, &num_cct,fs);
     cms_cct_info_fprint(num_cct,x,ofs);
 
-    for(int i = 0; i<num_cct; i++){
+    for(uint i = 0; i<num_cct; i++){
       if(x[i].num_val != 0){
         cct_sparse_metrics_t csm;
         csm.num_vals = x[i].num_val;

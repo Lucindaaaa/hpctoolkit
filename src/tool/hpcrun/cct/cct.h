@@ -120,24 +120,6 @@ typedef struct cct_node_t cct_node_t;
 
 typedef cct_node_t* cct_node_id_t;
 
-//YUMENG
-struct sparse_metrics_t{
-  int tid;
-  size_t num_cct;
-  uint64_t num_vals;
-  cct_metric_data_t* values;
-  uint16_t* mids;
-  
-  uint64_t cur_cct_offset;
-
-  //to get (cct id: cct_offset) pair, need to clean the design a little bit afterwards
-  uint32_t *cct_id;
-  uint64_t *cct_off;
-  uint32_t num_nz_cct;
-};
-
-typedef struct sparse_metrics_t sparse_metrics_t;
-
 //
 // Interface procedures
 //
@@ -293,7 +275,7 @@ int hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map,
 #else 
 //YUMENG: add sparse_metrics to collect metric values and info 
 int hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map,
-                      cct_node_t* cct, FILE* fs, epoch_flags_t flags,sparse_metrics_t* sparse_metrics);
+                      cct_node_t* cct, FILE* fs, epoch_flags_t flags, hpcrun_fmt_sparse_metrics_t* sparse_metrics);
 #endif
 //
 // Utilities

@@ -625,7 +625,7 @@ hpcrun_metric_sparse_count(metric_data_list_t* list)
 }
 
 
-int
+uint64_t
 hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, uint16_t* metric_ids,
 			     metric_data_list_t* list, int initializing_offset)
 {
@@ -636,7 +636,7 @@ hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, uint16_t* metric_ids,
   cct_metric_data_t curr_m;
 
   int curr_id = 0;//global id of metrics
-  int num_nzval = 0;//current number of non-zero values
+  uint64_t num_nzval = 0;//current number of non-zero values
 
   for (curr_k = first_kind; curr_k != NULL; curr_k = curr_k->link) {
     for (curr = list; curr != NULL && curr->kind != curr_k; curr = curr->next);
@@ -645,7 +645,7 @@ hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, uint16_t* metric_ids,
       for(int i = 0; i < curr_k->idx; i++ ){
         curr_m = actual[i].v1;
         if(curr_m.i != 0){ 
-          val[initializing_offset+num_nzval] = curr_m;
+          val[initializing_offset + num_nzval] = curr_m;
           metric_ids[initializing_offset + num_nzval] = (uint16_t)curr_id;
           num_nzval++;
         }

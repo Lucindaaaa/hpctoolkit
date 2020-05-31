@@ -112,7 +112,7 @@ hpcrun_cct_bundle_fwrite(FILE* fs, epoch_flags_t flags, cct_bundle_t* bndl,
 //YUMENG: add sparse_metrics to collect metric values and info
 int 
 hpcrun_cct_bundle_fwrite(FILE* fs, epoch_flags_t flags, cct_bundle_t* bndl,
-                         cct2metrics_t* cct2metrics_map, sparse_metrics_t* sparse_metrics)
+                         cct2metrics_t* cct2metrics_map, hpcrun_fmt_sparse_metrics_t* sparse_metrics)
 #endif
 {
   if (!fs) { return HPCRUN_ERR; }

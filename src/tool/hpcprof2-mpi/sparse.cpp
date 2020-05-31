@@ -148,7 +148,7 @@ void SparseDB::notifyThreadFinal(const Thread::Temporary& tt) {
   sm.num_cct = contexts.size();
   sm.num_nz_cct = coffsets.size();
   sm.values = values.data();
-  sm.mid = mids.data();
+  sm.mids = mids.data();
   sm.cct_id = cids.data();
   sm.cct_off = coffsets.data();
 

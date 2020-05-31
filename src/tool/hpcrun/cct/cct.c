@@ -292,7 +292,7 @@ typedef struct {
   cct2metrics_t* cct2metrics_map;
 
   //YUMENG: get metric values while walking through cct
-  sparse_metrics_t* sparse_metrics;
+  hpcrun_fmt_sparse_metrics_t* sparse_metrics;
 
 } write_arg_t;
 
@@ -384,7 +384,7 @@ lwrite(cct_node_t* node, cct_op_arg_t arg, size_t level)
   }
 
   write_arg_t* my_arg = (write_arg_t*) arg;
-  sparse_metrics_t* sparse_metrics = my_arg->sparse_metrics;
+  hpcrun_fmt_sparse_metrics_t* sparse_metrics = my_arg->sparse_metrics;
   hpcrun_fmt_cct_node_t* tmp = my_arg->tmp_node;
   epoch_flags_t flags = my_arg->flags;
   cct_addr_t* addr    = hpcrun_cct_addr(node);
@@ -819,7 +819,7 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
 #else
 //YUMENG: add sparse_metrics to collect metric values
 int
-hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epoch_flags_t flags, sparse_metrics_t* sparse_metrics)
+hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epoch_flags_t flags, hpcrun_fmt_sparse_metrics_t* sparse_metrics)
 #endif
 {
   if (!fs) return HPCRUN_ERR;
@@ -848,22 +848,6 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
   TMSG(DATA_WRITE, "num metrics in a cct node = %d", num_kind_metrics);
 
   hpcrun_fmt_cct_node_t tmp_node;
-
-#if 0
-//YUMENG: count the number of non-zero values for each cct, already merged with hpcrun_cct_num_nodes
-  uint64_t num_nzval1 = 0;
-  sizes_arg_t sizes_arg = {
-    // multithreaded code: add personalized cct2metrics_map for multithreading programs
-    // this is to allow a thread to write the profile data of another thread.
-    .cct2metrics_map = cct2metrics_map,
-    .num_nzval = num_nzval1
-  };
-
-  if (!HPCRUN_CCT_KEEP_DUMMY) {
-    hpcrun_cct_walk_child_1st(cct, collapse_dummy_node, &sizes_arg);
-  }
-  hpcrun_cct_walk_node_1st(cct, lcount_nzval, &sizes_arg);
-#endif
 
   sparse_metrics->num_vals = num_nzval;
   sparse_metrics->values = (cct_metric_data_t *) hpcrun_malloc(num_nzval * sizeof(cct_metric_data_t));
@@ -895,12 +879,17 @@ hpcrun_cct_fwrite(cct2metrics_t* cct2metrics_map, cct_node_t* cct, FILE* fs, epo
   }
   hpcrun_cct_walk_node_1st(cct, lwrite, &write_arg);
 
-#if 1
-//YUMENG
-//numnzcct should equal
-  if(sparse_metrics->cur_cct_offset != sparse_metrics->num_vals) printf("\nTEST: number of nzvals and cur_cct_off set are not equal if printed. \n");
-#endif
 
+  //try to make sure the recorded info are correct
+  if(sparse_metrics->num_nz_cct != num_nzcct) {
+    EEMSG("ERROR: recorded number of non-zeros ccts don't match");
+    return HPCRUN_ERR;
+  }
+  if(sparse_metrics->cur_cct_offset != sparse_metrics->num_vals){
+    EEMSG("ERROR: number of nzvals and cur_cct_offset are not equal after walking through the cct tree");
+    return HPCRUN_ERR;
+  } 
+    
   return HPCRUN_OK;
 }
 

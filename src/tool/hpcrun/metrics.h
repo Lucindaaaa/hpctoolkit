@@ -181,7 +181,7 @@ extern void hpcrun_metric_set_dense_copy(cct_metric_data_t* dest,
 //
 //extern void datalist_display(metric_data_list_t *data_list);
 
-extern int hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, uint16_t* metric_ids,
+extern uint64_t hpcrun_metric_set_sparse_copy(cct_metric_data_t* val, uint16_t* metric_ids,
 					 metric_data_list_t* list, int initializing_offset);
 
 extern uint64_t hpcrun_metric_sparse_count(metric_data_list_t* list);

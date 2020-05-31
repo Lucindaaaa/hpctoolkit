@@ -1516,7 +1516,10 @@ Profile::fmt_epoch_fread(Profile* &prof, FILE* infs, uint rFlags,
   // cct_metrics_sparse_values - YUMENG
   // ----------------------------------------
   hpcrun_fmt_sparse_metrics_t sparse_metrics;
-  hpcrun_fmt_sparse_metrics_fread(&sparse_metrics,infs);
+  ret = hpcrun_fmt_sparse_metrics_fread(&sparse_metrics,infs);
+  if (ret != HPCFMT_OK) {
+    DIAG_Throw("error reading 'metric-tbl'");
+  }
   hpcrun_fmt_sparse_metrics_fprint(&sparse_metrics,outfs,&metricTbl,"  ");
   hpcrun_fmt_sparse_metrics_free(&sparse_metrics, free);
 

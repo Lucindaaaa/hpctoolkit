@@ -822,15 +822,17 @@ hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
   HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(x->num_nz_cct), fs));
 
   x->values = (hpcrun_metricVal_t *) malloc((x->num_vals)*sizeof(hpcrun_metricVal_t));
+  x->mids = (uint16_t *) malloc((x->num_vals)*sizeof(uint16_t));
   for (uint i = 0; i < x->num_vals; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->values[i].bits), fs));
+    HPCFMT_ThrowIfError(hpcfmt_int2_fread(&x->mids[i], fs));
   }
-
+/*
   x->mids = (uint16_t *) malloc((x->num_vals)*sizeof(uint16_t));
   for (uint i = 0; i < x->num_vals; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int2_fread(&x->mids[i], fs));
   }
-
+*/
   x->cct_id = (uint32_t *) malloc((x->num_nz_cct)*sizeof(uint32_t));
   x->cct_off = (uint64_t *) malloc((x->num_nz_cct)*sizeof(uint64_t));
   for (uint i = 0; i < x->num_nz_cct; ++i) {
@@ -845,22 +847,23 @@ hpcrun_fmt_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
 int
 hpcrun_fmt_sparse_metrics_fwrite(hpcrun_fmt_sparse_metrics_t* x,FILE* fs)
 {
-  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->tid, fs));
+  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite(x->tid, fs));
   HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->num_vals, fs));
-  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->num_nz_cct, fs));
+  HPCFMT_ThrowIfError(hpcfmt_int4_fwrite(x->num_nz_cct, fs));
 
 
   for (uint i = 0; i < x->num_vals; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->values[i].bits, fs));
+    HPCFMT_ThrowIfError(hpcfmt_int2_fwrite(x->mids[i], fs));
   }
-
+/*
   for (uint i = 0; i < x->num_vals; ++i) {
     HPCFMT_ThrowIfError(hpcfmt_int2_fwrite(x->mids[i], fs));
   }
-
+*/
   for (uint i = 0; i < x->num_nz_cct; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int4_fwrite((uint32_t)x->cct_id[i], fs));
-    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite((uint64_t)x->cct_off[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int4_fwrite(x->cct_id[i], fs));
+    HPCFMT_ThrowIfError(hpcfmt_int8_fwrite(x->cct_off[i], fs));
   }
 
   return HPCFMT_OK;
@@ -872,10 +875,10 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
           const metric_tbl_t* metricTbl, const char* pre)
 {
   fprintf(fs, "[sparse metrics:\n");
-  fprintf(fs, "%s(thread ID: %d)\n%s(number of non-zero metrics: %ld)\n",
-	  pre, (int)x->tid,pre, x->num_vals);
+  fprintf(fs, "%s(thread ID: %d)\n%s(number of non-zero metrics: %ld)\n%s(number of non-zero ccts: %d)\n",
+	  pre, x->tid, pre, x->num_vals, pre, x->num_nz_cct);
 
-  fprintf(fs, "%s(values: ", pre);
+  fprintf(fs, "%s((values:metric id) : ", pre);
   for (uint i = 0; i < x->num_vals; ++i) {
     hpcrun_metricFlags_t mflags = hpcrun_metricFlags_NULL;
     if (metricTbl) {
@@ -896,12 +899,15 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 	      break;
     }
 
+    fprintf(fs, ":%d", x->mids[i]);
+
     if (i + 1 < x->num_vals) {
       fprintf(fs, " ");
     }
   }
   fprintf(fs, ")\n");
 
+/*
   fprintf(fs, "%s(metric id: ",pre);
   for (uint i = 0; i < x->num_vals; ++i) {
     fprintf(fs, "%d", x->mids[i]);
@@ -910,6 +916,7 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
     }
   }
   fprintf(fs, ")\n");
+*/
 
   fprintf(fs,"%s(cct offsets (cct id : offset): ",pre);
   for (uint i = 0; i < x->num_nz_cct; i++) {
@@ -958,17 +965,17 @@ hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path)
   sparse_fs->mode = OPENED;
   sparse_fs->cur_pos = 0;
 
-  sparse_fs->cur_cct = 0;
-  sparse_fs->cur_metric = 0;
-  sparse_fs->cur_metric_id = 0;
-  sparse_fs->cur_lm = 0;
-  sparse_fs->cur_block = 0;
+  sparse_fs->cur_cct = 0;       //number of read ccts
+  sparse_fs->cur_metric = 0;    //position of next metric in terms of bytes
+  sparse_fs->cur_metric_id = 0; //id of next metrics
+  sparse_fs->cur_lm = 0;        //position of next loadmap in terms of bytes
+  sparse_fs->cur_block = 0;     
 
   //initialize footer
   fseek(fs, 0, SEEK_END);
   size_t footer_position = ftell(fs) - SF_FOOTER_SIZE;
   fseek(fs, footer_position, SEEK_SET);
-  for(int i = 0; i<7; i++){
+  for(int i = 0; i < SF_FOOTER_LENGTH; i++){
     if( hpcfmt_int8_fread(&(sparse_fs->footer[i]), fs) != HPCFMT_OK) {
       free(sparse_fs);
       return NULL;
@@ -993,7 +1000,6 @@ int hpcrun_sparse_resume(hpcrun_sparse_file_t* sparse_fs, const char* path)
 {
   if(sparse_fs->mode == OPENED){
     fprintf(stderr, "ERROR: the file descriptor in the hpcrun_sparse_file object is still open\n");
-    //exit(-1); //maybe change to not exit directly?
     return SF_ERR;
   }
   FILE* fs = hpcio_fopen_r(path);
@@ -1009,6 +1015,7 @@ void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs)
   if(sparse_fs->mode == OPENED) hpcio_fclose(sparse_fs->file);
   free(sparse_fs);
 }
+
 
 /* succeed: returns 0; error while reading: returns -1 */
 int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hdr)
@@ -1064,33 +1071,37 @@ int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_n
 /* succeed: returns a cct ID that we can read next_entry for; end of list: returns 0; error: returns -1 */
 int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
 {
+  //first time initialization 
   if(sparse_fs->cur_block == 0){
-    fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE),SEEK_SET);
+    fseek(sparse_fs->file, (sparse_fs->footer[SF_FOOTER_sparse_metrics] + SF_tid_SIZE), SEEK_SET);
     HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->num_nzval),sparse_fs->file));
-    //fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE+SF_num_val_SIZE+(SF_val_SIZE+SF_mid_SIZE)*(sparse_fs->num_nzval)),SEEK_SET);
-    fseek(sparse_fs->file,(sparse_fs->footer[SF_FOOTER_sparse_metrics]+SF_tid_SIZE+SF_num_val_SIZE),SEEK_SET);
     HPCFMT_ThrowIfError(hpcfmt_int4_fread(&(sparse_fs->num_nz_cct),sparse_fs->file));
-    sparse_fs->val_offset = sparse_fs->footer[SF_FOOTER_sparse_metrics]+ SF_tid_SIZE+SF_num_val_SIZE+ SF_num_nz_cct_SIZE;
-    sparse_fs->metric_pos_offset = sparse_fs->val_offset + SF_val_SIZE*(sparse_fs->num_nzval);
-    sparse_fs->cct_offset_offset = sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->num_nzval); 
+    sparse_fs->val_mid_offset = sparse_fs->footer[SF_FOOTER_sparse_metrics]+ SF_tid_SIZE + SF_num_val_SIZE + SF_num_nz_cct_SIZE;
+    sparse_fs->cct_offset_offset = sparse_fs->val_mid_offset + (SF_mid_SIZE + SF_val_SIZE)*sparse_fs->num_nzval; 
   }
   if(sparse_fs->cur_block == sparse_fs->num_nz_cct) return SF_END; //no more cct block
 
-  //seek to the first metric_position(id:offset) related to this cct
-  fseek(sparse_fs->file,(sparse_fs->cct_offset_offset + (SF_cct_id_SIZE+SF_cct_off_SIZE)*sparse_fs->cur_block),SEEK_SET);
-  size_t metric_block_pos;
-  int id;
-  HPCFMT_ThrowIfError(hpcfmt_int4_fread(&id,sparse_fs->file));
-  HPCFMT_ThrowIfError(hpcfmt_int8_fread(&metric_block_pos,sparse_fs->file));
-  fseek(sparse_fs->file,SF_cct_id_SIZE,SEEK_CUR);
-  HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->cur_block_end),sparse_fs->file));
-  if(sparse_fs->cur_block == sparse_fs->num_nz_cct - 1) sparse_fs->cur_block_end = sparse_fs->num_nzval;
-  if(metric_block_pos == sparse_fs->num_nzval) return SF_END; //might not be end of cct, but rest blocks are all empty
-  fseek(sparse_fs->file,(sparse_fs->metric_pos_offset + SF_mid_SIZE*metric_block_pos),SEEK_SET); 
+  //read the first val_metricID pair position related to this cct
+  fseek(sparse_fs->file,(sparse_fs->cct_offset_offset + (SF_cct_id_SIZE + SF_cct_off_SIZE) * sparse_fs->cur_block),SEEK_SET);
+  size_t val_mid_pos;
+  uint32_t cct_id;
+  HPCFMT_ThrowIfError(hpcfmt_int4_fread(&cct_id,sparse_fs->file));
+  HPCFMT_ThrowIfError(hpcfmt_int8_fread(&val_mid_pos,sparse_fs->file));
+
+  //set up records for this current block
+  sparse_fs->cur_block_start = val_mid_pos;
+  if(sparse_fs->cur_block < sparse_fs->num_nz_cct - 1){
+    fseek(sparse_fs->file, SF_cct_id_SIZE, SEEK_CUR);
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(sparse_fs->cur_block_end),sparse_fs->file));
+  }else{
+    sparse_fs->cur_block_end = sparse_fs->num_nzval; //last cct block
+  }
   sparse_fs->cur_block++;
 
-  return id;
+  //seek to the first val_metricID place
+  fseek(sparse_fs->file,(sparse_fs->val_mid_offset + (SF_mid_SIZE + SF_val_SIZE) * val_mid_pos),SEEK_SET); 
 
+  return cct_id;
 }
 
 /* succeed: returns positive metricID (matching metricTbl, start from 1); end of this block: 0;error: return -1*/
@@ -1098,25 +1109,24 @@ int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
 int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t* val)
 {
   if(sparse_fs->cur_block == 0){
-    fprintf(stderr, "ERROR: hpcrun_sparse_next_entry() has to be called after hpcrun_sparse_next_block() to set up entry point.\n");
+    fprintf(stderr, "ERROR: hpcrun_sparse_next_entry(...) has to be called after hpcrun_sparse_next_block(...) to set up entry point.\n");
     return SF_ERR;
   }
   size_t cur_pos = ftell(sparse_fs->file);
-  if(cur_pos == sparse_fs->metric_pos_offset + SF_mid_SIZE*(sparse_fs->cur_block_end) )return SF_END; 
+  size_t cur_block_start_pos = sparse_fs->val_mid_offset + (SF_mid_SIZE + SF_val_SIZE) * sparse_fs->cur_block_start;
+  size_t cur_block_end_pos   = sparse_fs->val_mid_offset + (SF_mid_SIZE + SF_val_SIZE) * sparse_fs->cur_block_end;
+  if((cur_pos < cur_block_start_pos) || (cur_pos > cur_block_end_pos)){
+    fprintf(stderr, "ERROR: cannot read next entry for current cct: current position of hpcrun_sparse_file object is not within curren cct block's range.\n");
+    return SF_ERR;
+  }
+  if(cur_pos == cur_block_end_pos) return SF_END; 
 
-  uint16_t id;
-  uint64_t offset;
-  HPCFMT_ThrowIfError(hpcfmt_int2_fread(&id,sparse_fs->file));
-  //HPCFMT_ThrowIfError(hpcfmt_int8_fread(&offset,sparse_fs->file));
-  id ++; //match the metric id in metricTbl(starting as 1), it was recorded starting as 0
-  offset = (cur_pos - sparse_fs->metric_pos_offset)/SF_mid_SIZE; //for one thread, each metric id only has one value
-
-  //If MULTIPLE THREADS, then it will be a loop to get all values for one metric id
-  fseek(sparse_fs->file,(sparse_fs->val_offset)+SF_val_SIZE*offset,SEEK_SET);
+  uint16_t mid;
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(val->bits),sparse_fs->file));
-  fseek(sparse_fs->file,cur_pos+SF_mid_SIZE,SEEK_SET); //set for next entry 
+  HPCFMT_ThrowIfError(hpcfmt_int2_fread(&mid,sparse_fs->file));
+  mid ++; //match the metric id in metricTbl(starting as 1), it was recorded starting as 0
 
-  return id;
+  return mid;
 }
 
 

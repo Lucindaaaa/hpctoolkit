@@ -388,8 +388,7 @@ void SparseDB::collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::
   uint32_t num_nzcct;
   interpretByte8(num_val,   bytes.data() + TMS_tid_SIZE);
   interpretByte4(num_nzcct, bytes.data() + TMS_tid_SIZE + TMS_num_val_SIZE);
-  int before_cct_SIZE = TMS_prof_skip_SIZE + num_val * (TMS_val_SIZE + TMS_mid_SIZE);
-  int before_mid_SIZE = TMS_prof_skip_SIZE + num_val * TMS_val_SIZE;
+  int before_cct_SIZE     = TMS_prof_skip_SIZE + num_val * (TMS_val_SIZE + TMS_mid_SIZE);
 
   for(uint i = 0; i < num_nzcct; i++){
     uint32_t cct_id;
@@ -407,7 +406,7 @@ void SparseDB::collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::
     //nz_mids (number of non-zero values = number of non-zero metric ids for one profile one cct)
     for(uint m = 0; m < num_val_this_cct; m++){
       uint16_t mid;
-      interpretByte2(mid, bytes.data() + before_mid_SIZE + (cct_offset + m) * TMS_mid_SIZE);
+      interpretByte2(mid, bytes.data() + TMS_prof_skip_SIZE + (cct_offset + m) * (TMS_mid_SIZE + TMS_val_SIZE) + TMS_val_SIZE);
       if(cct_nzmids[CCTIDX(cct_id)].size() == 0){
         std::set<uint16_t> mids;
         cct_nzmids[CCTIDX(cct_id)] = mids;
@@ -1035,7 +1034,7 @@ void SparseDB::merge(int threads, std::size_t ctxcnt) {
   std::set<uint16_t> empty;
   std::vector<std::set<uint16_t>> cct_nzmids(ctxcnt,empty);
   writeThreadMajor(threads,world_rank,world_size, cct_local_sizes,cct_nzmids);
-  writeCCTMajor(cct_local_sizes,cct_nzmids, ctxcnt, world_rank, world_size, threads);
+  //writeCCTMajor(cct_local_sizes,cct_nzmids, ctxcnt, world_rank, world_size, threads);
 }
 
 

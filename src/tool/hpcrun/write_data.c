@@ -309,7 +309,7 @@ write_epochs(FILE* fs, core_profile_trace_data_t * cptd, epoch_t* epoch, size_t*
  
   //initialize the sparse_metrics
     hpcrun_fmt_sparse_metrics_t sparse_metrics;
-    sparse_metrics.tid = cptd->id;
+    sparse_metrics.tid = (uint32_t)cptd->id;
 
   //assign value while writing cct info
     int ret = hpcrun_cct_bundle_fwrite(fs, epoch_flags, cct, cptd->cct2metrics_map, &sparse_metrics);

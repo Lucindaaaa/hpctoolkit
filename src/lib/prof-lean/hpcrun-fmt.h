@@ -593,7 +593,7 @@ hpcrun_fmt_lip_fprint(lush_lip_t* x, FILE* fs, const char* pre);
 // hpcrun_fmt_sparse_metrics_t
 // --------------------------------------------------------------------------
 struct hpcrun_fmt_sparse_metrics_t{
-  int tid;
+  uint32_t tid;
   uint64_t num_vals;
   uint64_t num_cct;
   hpcrun_metricVal_t* values;
@@ -678,11 +678,12 @@ typedef struct hpcrun_sparse_file {
   uint32_t cur_block;
 
   //to read metric values for current block, initialized when hpcrun_sparse_next_block is called
-  size_t cur_block_end;
+  size_t cur_block_end; //in terms of number of nzvals 
+  size_t cur_block_start;//in terms of number of nzvals 
   uint64_t num_nzval;
-  size_t metric_pos_offset;
+  //size_t metric_pos_offset;
   size_t cct_offset_offset;
-  size_t val_offset;
+  size_t val_mid_offset;
   uint32_t num_nz_cct;
 
 } hpcrun_sparse_file_t;

@@ -318,9 +318,8 @@ void SparseDB::convertToByte8(uint64_t val, char* bytes){
   (0:186:112:65258   1:136:74:98930   2:138:75:107934   3:136:74:6224   4:131:71:70016   5:148:85:91202   ...)
 ]
 [
-  (values:  4.02057  4.02057  4.02057  3.98029  0.01816  0.00154  ...)
-  (metric id: 1 1 1 1 1 0 ...)
-  (cct offsets (cct id : offset): 1:0 7:1 9:2 21:3 23:4 25:5 ...)
+  (value:metric id): 2.48075:1  2.48075:1  2.48075:1  0.000113:1  0.000113:0  0.000113:1  ...
+  (cct id : offset): 1:0 7:1 9:2 11:3 15:4 ...
 ]
 ...same [sparse metrics] for all rest threads 
 */

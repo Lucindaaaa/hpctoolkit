@@ -1189,12 +1189,9 @@ int
 tms_sparse_metrics_fread(hpcrun_fmt_sparse_metrics_t* x, FILE* fs)
 {
   x->values = (hpcrun_metricVal_t *) malloc((x->num_vals)*sizeof(hpcrun_metricVal_t));
-  for (uint i = 0; i < x->num_vals; ++i) {
-    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->values[i].bits), fs));
-  }
-
   x->mids = (uint16_t *) malloc((x->num_vals)*sizeof(uint16_t));
   for (uint i = 0; i < x->num_vals; ++i) {
+    HPCFMT_ThrowIfError(hpcfmt_int8_fread(&(x->values[i].bits), fs));
     HPCFMT_ThrowIfError(hpcfmt_int2_fread(&x->mids[i], fs));
   }
 
@@ -1214,7 +1211,7 @@ tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
           const metric_tbl_t* metricTbl, const char* pre)
 {
 
-  fprintf(fs, "[\n%s(values: ", pre);
+  fprintf(fs, "[\n%s(value:metric id):", pre);
   for (uint i = 0; i < x->num_vals; ++i) {
     hpcrun_metricFlags_t mflags = hpcrun_metricFlags_NULL;
     if (metricTbl) {
@@ -1234,30 +1231,23 @@ tms_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 	      fprintf(fs, " %g", x->values[i].r);
 	      break;
     }
+    fprintf(fs, ":%d", x->mids[i]);
 
     if (i + 1 < x->num_vals) {
       fprintf(fs, " ");
     }
   }
-  fprintf(fs, ")\n");
+  fprintf(fs, "\n");
 
-  fprintf(fs, "%s(metric id: ",pre);
-  for (uint i = 0; i < x->num_vals; ++i) {
-    fprintf(fs, "%d", x->mids[i]);
-    if (i + 1 < x->num_vals) {
-      fprintf(fs, " ");
-    }
-  }
-  fprintf(fs, ")\n");
 
-  fprintf(fs,"%s(cct offsets (cct id : offset): ",pre);
+  fprintf(fs,"%s(cct id : offset): ",pre);
   for (uint i = 0; i < x->num_nz_cct; i++) {
     fprintf(fs, "%d:%ld", x->cct_id[i], x->cct_off[i]);
     if (i + 1 < x->num_nz_cct) {
       fprintf(fs, " ");
     }
   }
-  fprintf(fs, ")\n");
+  fprintf(fs, "\n");
 
   fprintf(fs, "]\n");
 

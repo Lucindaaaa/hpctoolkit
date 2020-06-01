@@ -790,15 +790,12 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_
   if(my_cct_offsets.back().second == NEED_NUM_VAL) my_cct_offsets.back().second = prof_info.num_val;
   uint64_t first_offset = my_cct_offsets.front().second;
   uint64_t last_offset  = my_cct_offsets.back().second;
-  MPI_Offset val_start_pos = offset + first_offset * TMS_val_SIZE;
-  MPI_Offset mid_start_pos = offset + prof_info.num_val * TMS_val_SIZE + first_offset * TMS_mid_SIZE;
-  int val_count = (last_offset - first_offset) * TMS_val_SIZE;
-  int mid_count = (last_offset - first_offset) * TMS_mid_SIZE;
-  char vinput[val_count];
-  char minput[mid_count];
+  MPI_Offset val_mid_start_pos = offset + first_offset * (TMS_val_SIZE + TMS_mid_SIZE);
+  int val_mid_count = (last_offset - first_offset) * (TMS_val_SIZE + TMS_mid_SIZE);
+  char vminput[val_mid_count];
   MPI_Status stat;
-  if(val_count != 0) MPI_File_read_at(fh, val_start_pos, &vinput, val_count, MPI_BYTE, &stat);
-  if(mid_count != 0) MPI_File_read_at(fh, mid_start_pos, &minput, mid_count, MPI_BYTE, &stat);
+  if(val_mid_count != 0) MPI_File_read_at(fh, val_mid_start_pos, &vminput, val_mid_count, MPI_BYTE, &stat);
+
 
   //for each cct, keep track of the values,metric ids, and thread ids
   for(uint c = 0; c < my_cct_offsets.size() - 1; c++) 
@@ -806,15 +803,15 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_
     uint32_t cct_id  = my_cct_offsets[c].first;
     uint64_t cct_off = my_cct_offsets[c].second;
     uint64_t num_val_this_cct = my_cct_offsets[c + 1].second - cct_off;
-    char* val_start_this_cct = vinput + (cct_off - first_offset) * TMS_val_SIZE;
-    char* mid_start_this_cct = minput + (cct_off - first_offset) * TMS_mid_SIZE;
+    char* val_mid_start_this_cct = vminput + (cct_off - first_offset) * (TMS_val_SIZE + TMS_mid_SIZE);
+
 
     for(uint i = 0; i < num_val_this_cct; i++){
       //get a pair of val and mid
       hpcrun_metricVal_t val;
       uint16_t mid;
-      interpretByte8(val.bits,val_start_this_cct + i * TMS_val_SIZE);
-      interpretByte2(mid,     mid_start_this_cct + i * TMS_mid_SIZE);
+      interpretByte8(val.bits,val_mid_start_this_cct + i * (TMS_val_SIZE + TMS_mid_SIZE));
+      interpretByte2(mid,     val_mid_start_this_cct + i * (TMS_val_SIZE + TMS_mid_SIZE) + TMS_val_SIZE);
 
       //store them - if cct_id already exists in cct_data_pairs
       std::unordered_map<uint32_t,std::vector<DataBlock>>::iterator got = cct_data_pairs.find (cct_id);
@@ -1033,7 +1030,7 @@ void SparseDB::merge(int threads, std::size_t ctxcnt) {
   std::set<uint16_t> empty;
   std::vector<std::set<uint16_t>> cct_nzmids(ctxcnt,empty);
   writeThreadMajor(threads,world_rank,world_size, cct_local_sizes,cct_nzmids);
-  //writeCCTMajor(cct_local_sizes,cct_nzmids, ctxcnt, world_rank, world_size, threads);
+  writeCCTMajor(cct_local_sizes,cct_nzmids, ctxcnt, world_rank, world_size, threads);
 }
 
 

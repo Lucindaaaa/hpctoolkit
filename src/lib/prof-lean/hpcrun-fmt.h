@@ -627,6 +627,7 @@ hpcrun_fmt_sparse_metrics_free(hpcrun_fmt_sparse_metrics_t* x, hpcfmt_free_fn de
 // --------------------------------------------------------------------------
 #define OPENED 0
 #define PAUSED 1
+#define MODE(m) (m == 0) ? "OPENED" : "PAUSED"
 
 static const int SF_SUCCEED = 0;
 static const int SF_END     = 0;
@@ -692,6 +693,7 @@ hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path);
 int hpcrun_sparse_pause(hpcrun_sparse_file_t* sparse_fs);
 int hpcrun_sparse_resume(hpcrun_sparse_file_t* sparse_fs, const char* path);
 void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs);
+int hpcrun_sparse_check_mode(hpcrun_sparse_file_t* sparse_fs, bool expected, const char* msg);
 
 int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hdr);
 int hpcrun_sparse_next_lm(hpcrun_sparse_file_t* sparse_fs, loadmap_entry_t* lm);

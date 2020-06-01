@@ -989,8 +989,11 @@ hpcrun_sparse_file_t* hpcrun_sparse_open(const char* path)
 /* succeed: return 0; fail: return 1; */
 int hpcrun_sparse_pause(hpcrun_sparse_file_t* sparse_fs)
 {
+  int ret = hpcrun_sparse_check_mode(sparse_fs, OPENED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   sparse_fs->cur_pos = ftell(sparse_fs->file);
-  int ret = hpcio_fclose(sparse_fs->file);
+  ret = hpcio_fclose(sparse_fs->file);
   if(!ret) sparse_fs->mode = PAUSED;
   return ret;
 }
@@ -998,10 +1001,9 @@ int hpcrun_sparse_pause(hpcrun_sparse_file_t* sparse_fs)
 /* succeed: return 0; fail open: return 1; was open already: return -1 */
 int hpcrun_sparse_resume(hpcrun_sparse_file_t* sparse_fs, const char* path)
 {
-  if(sparse_fs->mode == OPENED){
-    fprintf(stderr, "ERROR: the file descriptor in the hpcrun_sparse_file object is still open\n");
-    return SF_ERR;
-  }
+  int ret = hpcrun_sparse_check_mode(sparse_fs, PAUSED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   FILE* fs = hpcio_fopen_r(path);
   if(!fs) return SF_FAIL;
   sparse_fs->file = fs;
@@ -1016,12 +1018,26 @@ void hpcrun_sparse_close(hpcrun_sparse_file_t* sparse_fs)
   free(sparse_fs);
 }
 
+/* check if current mode is as expected, yes: 0; no: -1 */
+int hpcrun_sparse_check_mode(hpcrun_sparse_file_t* sparse_fs, bool expected, const char* msg)
+{
+  if(sparse_fs->mode != expected){
+    fprintf(stderr, "ERROR: %s: hpcrun_sparse_file object's current state is %s, not as expected %s\n", 
+      msg, MODE(sparse_fs->mode), MODE(expected));
+    return SF_ERR;
+  }
+  return SF_SUCCEED;
+}
+
 
 /* succeed: returns 0; error while reading: returns -1 */
 int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hdr)
 {
+  int ret = hpcrun_sparse_check_mode(sparse_fs, OPENED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   fseek(sparse_fs->file, sparse_fs->footer[SF_FOOTER_hdr],SEEK_SET);
-  int ret = hpcrun_fmt_hdr_fread(hdr, sparse_fs->file, malloc);
+  ret = hpcrun_fmt_hdr_fread(hdr, sparse_fs->file, malloc);
   if(ret != HPCFMT_OK) return SF_ERR;
   return SF_SUCCEED;
 }
@@ -1029,12 +1045,15 @@ int hpcrun_sparse_read_hdr(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_hdr_t* hd
 /* succeed: returns positive id; End of list: returns 0; Fail reading: returns -1; */
 int hpcrun_sparse_next_lm(hpcrun_sparse_file_t* sparse_fs, loadmap_entry_t* lm)
 {
+  int ret = hpcrun_sparse_check_mode(sparse_fs, OPENED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   if(sparse_fs->cur_lm == 0) sparse_fs->cur_lm = SF_num_lm_SIZE; //the first lm should skip the info about number of lms
 
   size_t realoffset = sparse_fs->footer[SF_FOOTER_lm] + sparse_fs->cur_lm;
   if(realoffset == sparse_fs->footer[SF_FOOTER_cct]) return SF_END; // no more next lm
   fseek(sparse_fs->file, realoffset, SEEK_SET);
-  int ret = hpcrun_fmt_loadmapEntry_fread(lm, sparse_fs->file, malloc);
+  ret = hpcrun_fmt_loadmapEntry_fread(lm, sparse_fs->file, malloc);
   sparse_fs->cur_lm += ret;
 
   return (lm) ? lm->id : SF_ERR;
@@ -1043,6 +1062,9 @@ int hpcrun_sparse_next_lm(hpcrun_sparse_file_t* sparse_fs, loadmap_entry_t* lm)
 /* succeed: returns a metric ID; end of list: returns 0; error: returns -1 */
 int hpcrun_sparse_next_metric(hpcrun_sparse_file_t* sparse_fs, metric_desc_t* m, metric_aux_info_t* perf_info,double fmtVersion)
 {
+  int ret = hpcrun_sparse_check_mode(sparse_fs, OPENED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   if(sparse_fs->cur_metric == 0) sparse_fs->cur_metric = SF_num_metric_SIZE; //the first metric should skip the info about number of metrics
 
   size_t realoffset = sparse_fs->footer[SF_FOOTER_metric_tbl] + sparse_fs->cur_metric;
@@ -1058,6 +1080,9 @@ int hpcrun_sparse_next_metric(hpcrun_sparse_file_t* sparse_fs, metric_desc_t* m,
 /* succeed: returns a cct ID; end of list: returns 0; error: returns -1 */
 int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_node_t* node)
 {
+  int ret = hpcrun_sparse_check_mode(sparse_fs, OPENED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   if(sparse_fs->cur_cct == sparse_fs->footer[SF_FOOTER_num_cct]) return SF_END; //no more cct
   size_t realoffset = sparse_fs->footer[SF_FOOTER_cct] + (SF_cct_node_SIZE * sparse_fs->cur_cct) + SF_num_cct_SIZE; 
   fseek(sparse_fs->file, realoffset, SEEK_SET);
@@ -1071,6 +1096,9 @@ int hpcrun_sparse_next_context(hpcrun_sparse_file_t* sparse_fs, hpcrun_fmt_cct_n
 /* succeed: returns a cct ID that we can read next_entry for; end of list: returns 0; error: returns -1 */
 int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
 {
+  int ret = hpcrun_sparse_check_mode(sparse_fs, OPENED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   //first time initialization 
   if(sparse_fs->cur_block == 0){
     fseek(sparse_fs->file, (sparse_fs->footer[SF_FOOTER_sparse_metrics] + SF_tid_SIZE), SEEK_SET);
@@ -1108,6 +1136,9 @@ int hpcrun_sparse_next_block(hpcrun_sparse_file_t* sparse_fs)
 /* ASSUMPTION: it is called continously for one block, i.e. no other fseek happen between calls */
 int hpcrun_sparse_next_entry(hpcrun_sparse_file_t* sparse_fs, hpcrun_metricVal_t* val)
 {
+  int ret = hpcrun_sparse_check_mode(sparse_fs, OPENED, __func__);
+  if(ret != SF_SUCCEED) return SF_ERR;
+
   if(sparse_fs->cur_block == 0){
     fprintf(stderr, "ERROR: hpcrun_sparse_next_entry(...) has to be called after hpcrun_sparse_next_block(...) to set up entry point.\n");
     return SF_ERR;

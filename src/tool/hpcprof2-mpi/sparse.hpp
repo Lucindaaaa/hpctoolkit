@@ -153,6 +153,7 @@ public:
 
 
 
+
 private:
   hpctoolkit::stdshim::filesystem::path dir;
   void merge0(int, MPI_File&, const std::vector<std::pair<hpctoolkit::ThreadAttributes,
@@ -208,12 +209,25 @@ private:
     std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
   };
 
+  struct CCTDataPair{
+    uint32_t cctid;
+    std::vector<DataBlock> datas;
+  };
+/*
+  class ValThreadPairs{
+  public:   
+    std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
 
-  void unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc);
+    ValThreadPairs& VTmerge(const ValThreadPairs& other);
+  }
+*/
+
+  void unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc, int threads);
   void getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::set<uint16_t>>& cct_nzmids,
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,int threads, int rank);
   void getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
-    std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, uint64_t& total_size, int num_ranks, int rank);
+    std::vector<uint32_t>& my_ccts,uint64_t& last_cct_size, uint64_t& total_size, 
+    int num_ranks, int rank);
   void updateCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,uint64_t& total_size, size_t ctxcnt, int threads);
   
   void readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
@@ -221,14 +235,20 @@ private:
   int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
+
+  bool compareByTid(std::pair<hpcrun_metricVal_t,uint32_t> const& lhs, std::pair<hpcrun_metricVal_t,uint32_t> const& rhs);
+  bool compareByMid(DataBlock const& lhs, DataBlock const& rhs);
+
   void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info,
-    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs,MPI_File fh);
-  void readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh);
-  void dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, 
+     std::vector<CCTDataPair>& cct_data_pairs,MPI_File fh);
+  void readProfileInfo(std::vector<ProfileInfo>& prof_info, int threads, MPI_File fh);
+  void dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t>& cct_ids,
     std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
-  void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size,  MPI_File fh, MPI_File ofh);
+ // void prepCctDataPairs(const std::vector<uint32_t>& cct_ids, const std::vector<std::set<uint16_t>>& cct_nzmids, \
+     std::vector<CCTDataPair>& cct_data_pairs, const int threads);
+  void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info, 
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size, int threads, MPI_File fh, MPI_File ofh);
 
 };
 

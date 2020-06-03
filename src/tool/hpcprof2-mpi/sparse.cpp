@@ -538,7 +538,7 @@ void SparseDB::writeThreadMajor(const int threads, const int world_rank, const i
 //***************************************************************************
 
 // union cct_nzmids from all ranks to root, in order to avoid double counting for offset calculation
-void SparseDB::unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc)
+void SparseDB::unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc, int threads)
 {
   //convert to a long vector with stopper between mids for different ccts
   uint16_t stopper = -1;
@@ -561,8 +561,11 @@ void SparseDB::unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, 
   std::vector<uint16_t> global_all_mids;
   if(rank == 0){
     mids_disps.resize(num_proc);
+
+    #pragma omp parallel for num_threads(threads)
     for(int i = 0; i<num_proc; i++) mids_disps[i] = mids_sizes[i];
-    exscan<int>(mids_disps,1); //TODO: temporarily use 1 thread, try add omp 
+    exscan<int>(mids_disps,threads); 
+
     total_size = mids_disps.back() + mids_sizes.back();
     global_all_mids.resize(total_size);
   }
@@ -625,7 +628,8 @@ void SparseDB::getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::s
 
 //input: final offsets for all cct, output: my(rank) own responsible cct list
 void SparseDB::getMyCCTs(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,
-    std::vector<uint32_t>& my_ccts, uint64_t& last_cct_size, uint64_t& total_size, int num_ranks, int rank)
+    std::vector<uint32_t>& my_ccts, uint64_t& last_cct_size, uint64_t& total_size, 
+    int num_ranks, int rank)
 {
   MPI_Allreduce(MPI_IN_PLACE, &last_cct_size, 1 ,mpi_data<uint64_t>::type, MPI_SUM, MPI_COMM_WORLD);
 
@@ -654,7 +658,7 @@ void SparseDB::updateCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_o
 
 
 //read the Profile Information section of thread_major_sparse.db to get the list of profiles 
-void SparseDB::readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh)
+void SparseDB::readProfileInfo(std::vector<ProfileInfo>& prof_info, int threads, MPI_File fh)
 {
   //read the number of profiles
   uint32_t num_prof;
@@ -667,17 +671,19 @@ void SparseDB::readProfileInfo(std::vector<ProfileInfo>& prof_info, MPI_File fh)
   MPI_File_read_at(fh, TMS_total_prof_SIZE, &input, count, MPI_BYTE, &stat);
 
   //interpret the section and store in a vector of ProfileInfo
+  prof_info.resize(num_prof);
+  #pragma omp parallel for num_threads(threads)
   for(int i = 0; i<count; i += TMS_prof_info_SIZE){
     uint32_t tid;
     uint64_t num_val;
-    uint32_t num_nzcct;
+    uint32_t num_nzcct; 
     uint64_t offset;
     interpretByte4(tid,       input + i);
     interpretByte8(num_val,   input + i + TMS_tid_SIZE);
     interpretByte4(num_nzcct, input + i + TMS_tid_SIZE + TMS_num_val_SIZE);
     interpretByte8(offset,    input + i + TMS_tid_SIZE + TMS_num_val_SIZE + TMS_num_nzcct_SIZE);
     ProfileInfo pi = {tid, num_val, num_nzcct, offset};
-    prof_info.emplace_back(pi);
+    prof_info[i/TMS_prof_info_SIZE] = pi;
   }
 }
 
@@ -772,12 +778,22 @@ int SparseDB::binarySearchCCTid(std::vector<uint32_t>& cct_ids,
   return 1;
 }
 
-//read all the data for a group of ccts in cct_ids, from one profile with its prof_info, store data to cct_data_pairs 
-void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info,
-    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, MPI_File fh)
-{
-  //TODO: val and mid write together => one read per cct group
 
+bool SparseDB::compareByTid(std::pair<hpcrun_metricVal_t,uint32_t> const& lhs, std::pair<hpcrun_metricVal_t,uint32_t> const& rhs) {
+    return lhs.second < rhs.second;
+}
+bool SparseDB::compareByMid(DataBlock const& lhs, DataBlock const& rhs) {
+    return lhs.mid < rhs.mid;
+}
+
+
+
+//read all the data for a group of ccts in cct_ids, from one profile with its prof_info, store data to cct_data_pairs 
+//void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info,
+//    std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, MPI_File fh)
+void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info,
+    std::vector<CCTDataPair>& cct_data_pairs, MPI_File fh)
+{
   //find the corresponding cct and its offset in values and mids (this offset is not the offset of cct_major_sparse.db)
   MPI_Offset offset = prof_info.offset;
   MPI_Offset cct_offsets_offset = offset + prof_info.num_val * (TMS_val_SIZE + TMS_mid_SIZE);
@@ -796,7 +812,6 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_
   MPI_Status stat;
   if(val_mid_count != 0) MPI_File_read_at(fh, val_mid_start_pos, &vminput, val_mid_count, MPI_BYTE, &stat);
 
-
   //for each cct, keep track of the values,metric ids, and thread ids
   for(uint c = 0; c < my_cct_offsets.size() - 1; c++) 
   {
@@ -813,8 +828,13 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_
       interpretByte8(val.bits,val_mid_start_this_cct + i * (TMS_val_SIZE + TMS_mid_SIZE));
       interpretByte2(mid,     val_mid_start_this_cct + i * (TMS_val_SIZE + TMS_mid_SIZE) + TMS_val_SIZE);
 
+      
       //store them - if cct_id already exists in cct_data_pairs
-      std::unordered_map<uint32_t,std::vector<DataBlock>>::iterator got = cct_data_pairs.find (cct_id);
+      //std::unordered_map<uint32_t,std::vector<DataBlock>>::iterator got = cct_data_pairs.find (cct_id);
+      std::vector<CCTDataPair>::iterator got = std::find_if(cct_data_pairs.begin(), cct_data_pairs.end(), 
+                       [&cct_id] (const CCTDataPair& cdp) { 
+                          return cdp.cctid == cct_id; 
+                       });
 
       if ( got == cct_data_pairs.end() ){
         //this cct doesn't exist in cct_data_paris yet   
@@ -830,10 +850,11 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_
         datas.emplace_back(data);
 
         //store it
-        cct_data_pairs.emplace(cct_id,datas);
+        CCTDataPair cdp = {cct_id,datas};
+        cct_data_pairs.emplace_back(cdp);
       }else{
         //found the cct, try to find if this mid exists
-        std::vector<DataBlock>& datas = got->second; 
+        std::vector<DataBlock>& datas = got->datas; 
         std::vector<DataBlock>::iterator it = std::find_if(datas.begin(), datas.end(), 
                        [&mid] (const DataBlock& d) { 
                           return d.mid == mid; 
@@ -854,13 +875,14 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_
         }
 
       }//END of cct_id found in cct_data_pair 
+      
     }//END of storing values and thread ids for this cct
   }//END of storing values and thread ids for ALL cct
 
 }
 
 //convert collected data for a group of ccts to appropriate bytes 
-void SparseDB::dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock>>& cct_data_pairs, 
+void SparseDB::dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off, std::vector<uint32_t>& cct_ids,
     std::vector<char>& info_bytes,std::vector<char>& metrics_bytes)
 {
@@ -872,20 +894,23 @@ void SparseDB::dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock
     uint64_t num_val = 0;
     uint16_t num_nzmid = 0;
     uint64_t offset = cct_off[CCTIDX(cct_id)].second; 
-    std::unordered_map<uint32_t,std::vector<DataBlock>>::iterator got = cct_data_pairs.find (cct_id);
+    //std::unordered_map<uint32_t,std::vector<DataBlock>>::iterator got = cct_data_pairs.find (cct_id);
+    std::vector<CCTDataPair>::iterator cdp = std::find_if(cct_data_pairs.begin(), cct_data_pairs.end(), 
+                       [&cct_id] (const CCTDataPair& cdp) { 
+                          return cdp.cctid == cct_id; 
+                       });
 
-    if(got != cct_data_pairs.end()){ //cct_data_pairs has the cct_id, only update metric_bytes if it has the cct_id
-      std::vector<DataBlock>& datas = got->second;
+    if(cdp != cct_data_pairs.end()){ //cct_data_pairs has the cct_id, only update metric_bytes if it has the cct_id
+      std::vector<DataBlock>& datas = cdp->datas;
       //INFO_BYTES
       num_nzmid = datas.size();
       //METRIC_BYTES
       uint64_t this_cct_start_pos = offset - first_cct_off; //position relative to the beginning of metric_bytes
 
       uint64_t pre_val_tid_pair_size = 0; //keep track of how many val_tid pairs (sum over previous DataBlock for different mids) have been converted
-      for(int j =0; j < num_nzmid; j++){
+      for(int j = 0; j < num_nzmid; j++){
         DataBlock& d = datas[j];
         //INFO_BYTES
-        d.num_values = d.values_tids.size(); //set up for later use
         num_val += d.num_values ;
 
         //METRIC_BYTES - val_tid_pair
@@ -918,22 +943,100 @@ void SparseDB::dataPairs2Bytes(std::unordered_map<uint32_t,std::vector<DataBlock
   } //END OF CCT LOOP
 
 }
+/*
+void SparseDB::prepCctMidData(const std::vector<uint32_t>& cct_ids, const std::vector<std::set<uint16_t>>& cct_nzmids, 
+    std::vector<ValThreadPairs>& cct_mid_data, const int threads)
+{
+  //#pragma omp parallel for num_threads(threads)
+  for(uint i = 0; i < cct_ids.size(); i++){
+    uint32_t  cctid = cct_ids[i];
+    size_t num_mids = cct_nzmids[CCTIDX(cctid)].size();
+
+    std::vector<DataBlock> datas;
+    for(uint16_t m : cct_nzmids[CCTIDX(cctid)]){
+      DataBlock data;
+      data.mid = m;
+      std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
+      data.values_tids = values_tids;
+      datas.emplace_back(data);
+    }
+     
+    CCTDataPair cdp = {cctid, datas};
+    cct_data_pairs[i] = cdp;
+
+  }
+}*/
 
 //read a CCT group's data and write them out
-void SparseDB::rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info,
-    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size, MPI_File fh, MPI_File ofh)
+void SparseDB::rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info, 
+    std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size, int threads, MPI_File fh, MPI_File ofh)
 {
-  std::unordered_map<uint32_t,std::vector<DataBlock>> cct_data_pairs;
+  std::vector<CCTDataPair> cct_data_pairs;
 
-  //read all profiles for this cct_ids group
-  for(uint i = 0; i < prof_info.size(); i++){
-    ProfileInfo pi = prof_info[i];
-    readOneProfile(cct_ids, pi, cct_data_pairs, fh);
-  }
+  #pragma omp parallel num_threads(threads) 
+  {
+    //std::unordered_map<uint32_t,std::vector<DataBlock>> thread_cct_data_pairs;
+    std::vector<CCTDataPair> thread_cct_data_pairs;
+    //read all profiles for this cct_ids group
+    #pragma omp for
+    for(uint i = 0; i < prof_info.size(); i++){
+      ProfileInfo pi = prof_info[i];
+      readOneProfile(cct_ids, pi, thread_cct_data_pairs, fh);
+    }
 
-  //TODO: for each cct id and metric id, sort the value:thread id pair and finalize num_values if use omp
-  //  then update dataPair2Bytes accordingly
+    #pragma omp critical
+    {
+      for(CCTDataPair tcdp : thread_cct_data_pairs){
+        uint32_t cctid = tcdp.cctid;
+        std::vector<CCTDataPair>::iterator gcdp = std::find_if(cct_data_pairs.begin(), cct_data_pairs.end(), 
+                       [&cctid] (const CCTDataPair& cdp) { 
+                          return cdp.cctid == cctid; 
+                       });
 
+        if(gcdp == cct_data_pairs.end()){
+          cct_data_pairs.emplace_back(tcdp);
+        }else{
+          std::vector<DataBlock>& gdatas = gcdp->datas;
+          for(DataBlock tdata : tcdp.datas){
+            const uint16_t& mid = tdata.mid;
+            std::vector<DataBlock>::iterator gdata = std::find_if(gdatas.begin(), gdatas.end(), 
+                       [&mid] (const DataBlock& d) { 
+                          return d.mid == mid; 
+                       });
+
+            if(gdata == gdatas.end()){
+              gdatas.emplace_back(tdata);
+            }else{
+              gdata->values_tids.reserve(gdata->values_tids.size() + tdata.values_tids.size());
+              gdata->values_tids.insert(gdata->values_tids.end(), tdata.values_tids.begin(), tdata.values_tids.end());
+            }
+
+          }//END of iterating over exiting cct's mid-datas
+        }//END of if/else this cct exists 
+      } //END of iterating over all cct data pairs this thread has
+    } //END of critical region to synchronize cct_data_pairs
+    #pragma omp barrier
+
+    //for each cct id sort based on metric id, within each metric id data block, sort based on thread id
+    #pragma omp for
+    for(uint i = 0; i < cct_data_pairs.size(); i++){
+      CCTDataPair& cdp = cct_data_pairs[i];
+      for(uint j = 0; j < cdp.datas.size(); j++){
+        DataBlock& data = cdp.datas[j];
+        std::sort(data.values_tids.begin(), data.values_tids.end(), 
+          [](const std::pair<hpcrun_metricVal_t,uint32_t>& lhs, const std::pair<hpcrun_metricVal_t,uint32_t>& rhs) {
+            return lhs.second < rhs.second;
+          });  
+        data.num_values = data.values_tids.size(); //update each mid's num_values
+      }
+      std::sort(cdp.datas.begin(), cdp.datas.end(), [](const DataBlock& lhs, const DataBlock& rhs) {
+          return lhs.mid < rhs.mid;
+      });    
+    }
+    
+  } //END of parallel region for reading
+
+ 
   //write for this cct_ids group
   std::vector<char> info_bytes (CMS_cct_info_SIZE * cct_ids.size());
   uint32_t first_cct_id = cct_ids.front();
@@ -956,7 +1059,7 @@ void SparseDB::writeCCTMajor(std::vector<uint64_t>& cct_local_sizes, std::vector
     int ctxcnt, int world_rank, int world_size, int threads)
 {
   //Prepare a union cct_nzmids
-  unionMids(cct_nzmids,world_rank,world_size);
+  unionMids(cct_nzmids,world_rank,world_size, threads/world_size);
 
   //Get CCT global final offsets for cct_major_sparse.db
   std::vector<std::pair<uint32_t, uint64_t>> cct_off (ctxcnt);
@@ -968,6 +1071,7 @@ void SparseDB::writeCCTMajor(std::vector<uint64_t>& cct_local_sizes, std::vector
   getMyCCTs(cct_off,my_cct,last_cct_size,total_size, world_size, world_rank);
   updateCctOffset(cct_off, total_size, ctxcnt, threads/world_size);
 
+
   //Prepare files to read and write, get the list of profiles
   MPI_File thread_major_f;
   MPI_File_open(MPI_COMM_WORLD, (dir / "thread_major_sparse.db").c_str(),
@@ -978,7 +1082,7 @@ void SparseDB::writeCCTMajor(std::vector<uint64_t>& cct_local_sizes, std::vector
   writeAsByte4(ctxcnt,cct_major_f,0);
   
   std::vector<ProfileInfo> prof_info;
-  readProfileInfo(prof_info,thread_major_f);
+  readProfileInfo(prof_info,threads/world_size, thread_major_f);
 
   //For each cct group (< memory limit) this rank is in charge of, read and write
   std::vector<uint32_t> cct_ids;
@@ -991,14 +1095,14 @@ void SparseDB::writeCCTMajor(std::vector<uint64_t>& cct_local_sizes, std::vector
       cct_ids.emplace_back(my_cct[i]);
       cur_size += cur_cct_size;
     }else{
-      rwOneCCTgroup(cct_ids,prof_info,cct_off,total_size, thread_major_f,cct_major_f);
+      rwOneCCTgroup(cct_ids,prof_info,cct_off,total_size, threads/world_size, thread_major_f,cct_major_f);
       cct_ids.clear();
       cct_ids.emplace_back(my_cct[i]);
       cur_size = cur_cct_size;
     }   
 
     // final cct group
-    if((i == my_cct.size() - 1) && (cct_ids.size() != 0)) rwOneCCTgroup(cct_ids,prof_info,cct_off,total_size, thread_major_f,cct_major_f);
+    if((i == my_cct.size() - 1) && (cct_ids.size() != 0)) rwOneCCTgroup(cct_ids,prof_info,cct_off,total_size, threads/world_size,  thread_major_f,cct_major_f);
 
   }
 
@@ -1153,3 +1257,8 @@ void SparseDB::throwIfError(int result, int succeed, std::string string)
     //exit(-1);
   }
 }
+/*
+ValThreadPairs& SparseDB::ValThreadPairs::VTmerge(const ValThreadPairs& other)
+{
+  this->values_tids.insert(this->values_tids.end(), other.values_tids.begin(), other.values_tids.end());
+}*/

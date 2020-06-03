@@ -244,7 +244,7 @@ private:
   void readProfileInfo(std::vector<ProfileInfo>& prof_info, int threads, MPI_File fh);
   void dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t>& cct_ids,
-    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes);
+    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes, int threads);
  // void prepCctDataPairs(const std::vector<uint32_t>& cct_ids, const std::vector<std::set<uint16_t>>& cct_nzmids, \
      std::vector<CCTDataPair>& cct_data_pairs, const int threads);
   void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info, 

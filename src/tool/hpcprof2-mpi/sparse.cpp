@@ -884,10 +884,11 @@ void SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_
 //convert collected data for a group of ccts to appropriate bytes 
 void SparseDB::dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off, std::vector<uint32_t>& cct_ids,
-    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes)
+    std::vector<char>& info_bytes,std::vector<char>& metrics_bytes, int threads)
 {
   uint64_t first_cct_off =  cct_off[CCTIDX(cct_ids[0])].second; 
 
+  #pragma omp parallel for num_threads(threads)
   for(uint i = 0; i<cct_ids.size(); i++ ){
     //INFO_BYTES
     uint32_t cct_id = cct_ids[i];
@@ -1044,7 +1045,7 @@ void SparseDB::rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<Profile
   int metric_bytes_size = (last_cct_id == cct_off.back().first) ? total_size - cct_off[CCTIDX(first_cct_id)].second \
         : cct_off[CCTIDX(last_cct_id) + 1].second - cct_off[CCTIDX(first_cct_id)].second;
   std::vector<char> metrics_bytes (metric_bytes_size);
-  dataPairs2Bytes(cct_data_pairs, cct_off, cct_ids, info_bytes, metrics_bytes);
+  dataPairs2Bytes(cct_data_pairs, cct_off, cct_ids, info_bytes, metrics_bytes, threads);
 
   MPI_Status stat;
   MPI_Offset info_off = CMS_num_cct_SIZE + CCTIDX(first_cct_id) * CMS_cct_info_SIZE;

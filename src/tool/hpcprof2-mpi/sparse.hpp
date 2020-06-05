@@ -139,11 +139,11 @@ public:
   //***************************************************************************
   // Work with bytes  - YUMENG
   //***************************************************************************
-  void writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
-  void writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
-  void writeAsByteX(std::vector<char>& val, size_t size, MPI_File fh, MPI_Offset off);
-  void readAsByte4(uint32_t& val, MPI_File fh, MPI_Offset off);
-  void readAsByte8(uint64_t& val, MPI_File fh, MPI_Offset off);
+  int writeAsByte4(uint32_t val, MPI_File fh, MPI_Offset off);
+  int writeAsByte8(uint64_t val, MPI_File fh, MPI_Offset off);
+  int writeAsByteX(std::vector<char>& val, size_t size, MPI_File fh, MPI_Offset off);
+  int readAsByte4(uint32_t& val, MPI_File fh, MPI_Offset off);
+  int readAsByte8(uint64_t& val, MPI_File fh, MPI_Offset off);
   void interpretByte2(uint16_t& val, const char *input);
   void interpretByte4(uint32_t& val, const char *input);
   void interpretByte8(uint64_t& val, const char *input);
@@ -172,8 +172,18 @@ private:
   //***************************************************************************
   // general - YUMENG
   //***************************************************************************
-  void throwIfError(int result, int succeed, std::string string);
+  const int SPARSE_ERR = -1;
+  const int SPARSE_OK  =  0;
+  const int SPARSE_OOR = -2;
+  void exitIfMPIError(int error_code, std::string info);
+  void exitIfError(int error_code, std::string info);
+  int printIfMPIError(int error_code, std::string info);
+  int printIfError(int error_code, std::string info);
 
+  #define SPARSE_throwIfMPIError(r) if (r != MPI_SUCCESS) {return r; }
+  #define SPARSE_throwIfError(r,s) if (r != s) {return SPARSE_ERR; }
+  #define SPARSE_recordIfError(r, s, check) if(r != s) {check += 1; }
+  #define SPARSE_recordIfMPIError(r,check) if(r != MPI_SUCCESS) {check += 1; }
 
   //***************************************************************************
   // thread_major_sparse.db  - YUMENG
@@ -185,8 +195,8 @@ private:
       const std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
       const uint32_t total_prof, const uint64_t my_offset, const int threads);
 
-  void collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, const std::vector<char>& bytes);
-  void writeProfiles(const std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
+  int collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, const std::vector<char>& bytes);
+  int writeProfiles(const std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
     std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids,
     const std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
     const MPI_File fh, const int threads);
@@ -213,14 +223,6 @@ private:
     uint32_t cctid;
     std::vector<DataBlock> datas;
   };
-/*
-  class ValThreadPairs{
-  public:   
-    std::vector<std::pair<hpcrun_metricVal_t,uint32_t>> values_tids;
-
-    ValThreadPairs& VTmerge(const ValThreadPairs& other);
-  }
-*/
 
   void unionMids(std::vector<std::set<uint16_t>>& cct_nzmids, int rank, int num_proc, int threads);
   void getCctOffset(std::vector<uint64_t>& cct_sizes, std::vector<std::set<uint16_t>>& cct_nzmids,
@@ -230,24 +232,18 @@ private:
     int num_ranks, int rank);
   void updateCctOffset(std::vector<std::pair<uint32_t, uint64_t>>& cct_off,uint64_t& total_size, size_t ctxcnt, int threads);
   
-  void readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
+  void readProfileInfo(std::vector<ProfileInfo>& prof_info, int threads, MPI_File fh);
+  int readCCToffsets(std::vector<std::pair<uint32_t,uint64_t>>& cct_offsets,
     MPI_File fh,MPI_Offset off);
   int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
-
-  bool compareByTid(std::pair<hpcrun_metricVal_t,uint32_t> const& lhs, std::pair<hpcrun_metricVal_t,uint32_t> const& rhs);
-  bool compareByMid(DataBlock const& lhs, DataBlock const& rhs);
-
-  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info,
+  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info, int& check,
      std::vector<CCTDataPair>& cct_data_pairs,MPI_File fh);
-  void readProfileInfo(std::vector<ProfileInfo>& prof_info, int threads, MPI_File fh);
-  void dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
+  int dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t>& cct_ids,
     std::vector<char>& info_bytes,std::vector<char>& metrics_bytes, int threads);
- // void prepCctDataPairs(const std::vector<uint32_t>& cct_ids, const std::vector<std::set<uint16_t>>& cct_nzmids, \
-     std::vector<CCTDataPair>& cct_data_pairs, const int threads);
-  void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info, 
+  int rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size, int threads, MPI_File fh, MPI_File ofh);
 
 };

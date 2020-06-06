@@ -100,7 +100,7 @@ public:
   const int TMS_val_SIZE          = 8;
   const int TMS_mid_SIZE          = 2;
 
-  void writeThreadMajor(const int threads, const int world_rank, const int world_size, std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids);
+  int writeThreadMajor(const int threads, const int world_rank, const int world_size, std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids);
 
   //***************************************************************************
   // cct_major_sparse.db  - YUMENG
@@ -174,16 +174,10 @@ private:
   //***************************************************************************
   const int SPARSE_ERR = -1;
   const int SPARSE_OK  =  0;
-  const int SPARSE_OOR = -2;
   void exitIfMPIError(int error_code, std::string info);
-  void exitIfError(int error_code, std::string info);
   int printIfMPIError(int error_code, std::string info);
-  int printIfError(int error_code, std::string info);
 
   #define SPARSE_throwIfMPIError(r) if (r != MPI_SUCCESS) {return r; }
-  #define SPARSE_throwIfError(r,s) if (r != s) {return SPARSE_ERR; }
-  #define SPARSE_recordIfError(r, s, check) if(r != s) {check += 1; }
-  #define SPARSE_recordIfMPIError(r,check) if(r != MPI_SUCCESS) {check += 1; }
 
   //***************************************************************************
   // thread_major_sparse.db  - YUMENG
@@ -195,7 +189,7 @@ private:
       const std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,
       const uint32_t total_prof, const uint64_t my_offset, const int threads);
 
-  int collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, const std::vector<char>& bytes);
+  void collectCctMajorData(std::vector<uint64_t>& cct_local_sizes, std::vector<std::set<uint16_t>>& cct_nzmids, const std::vector<char>& bytes);
   int writeProfiles(const std::vector<std::pair<uint32_t, uint64_t>>& prof_offsets, 
     std::vector<uint64_t>& cct_local_sizes,std::vector<std::set<uint16_t>>& cct_nzmids,
     const std::vector<std::pair<const hpctoolkit::Thread*, uint64_t>>& profile_sizes,  
@@ -238,12 +232,12 @@ private:
   int binarySearchCCTid(std::vector<uint32_t>& cct_ids,
     std::vector<std::pair<uint32_t,uint64_t>>& profile_cct_offsets,
     std::vector<std::pair<uint32_t,uint64_t>>& my_cct_offsets);
-  void readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info, int& check,
+  int readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_info,
      std::vector<CCTDataPair>& cct_data_pairs,MPI_File fh);
-  int dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
+  void dataPairs2Bytes(std::vector<CCTDataPair>& cct_data_pairs, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off,std::vector<uint32_t>& cct_ids,
     std::vector<char>& info_bytes,std::vector<char>& metrics_bytes, int threads);
-  int rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info, 
+  void rwOneCCTgroup(std::vector<uint32_t>& cct_ids, std::vector<ProfileInfo>& prof_info, 
     std::vector<std::pair<uint32_t, uint64_t>>& cct_off, uint64_t total_size, int threads, MPI_File fh, MPI_File ofh);
 
 };

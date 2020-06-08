@@ -513,7 +513,7 @@ int SparseDB::writeProfiles(const std::vector<std::pair<uint32_t, uint64_t>>& pr
   }//END of parallel region
 
   if(num_wrong_prof > 0){
-    util::log::error() << num_wrong_prof << "profiles have problems during writing";
+    util::log::error() << num_wrong_prof << " profiles have problems during writing";
     return SPARSE_ERR;
   }
 
@@ -849,6 +849,7 @@ int SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_i
   MPI_Offset offset = prof_info.offset;
   MPI_Offset cct_offsets_offset = offset + prof_info.num_val * (TMS_val_SIZE + TMS_mid_SIZE);
   std::vector<std::pair<uint32_t,uint64_t>> full_cct_offsets (prof_info.num_nzcct);
+  if(full_cct_offsets.size() == 0) return SPARSE_OK;
 
   int r = printIfMPIError(readCCToffsets(full_cct_offsets,fh,cct_offsets_offset), 
                           __FUNCTION__ + std::string(": cannot read CCT offsets for profile ") + std::to_string(prof_info.tid));
@@ -856,7 +857,6 @@ int SparseDB::readOneProfile(std::vector<uint32_t>& cct_ids, ProfileInfo& prof_i
   
 
   std::vector<std::pair<uint32_t,uint64_t>> my_cct_offsets;
-  //SPARSE_recordIfError(binarySearchCCTid(cct_ids,full_cct_offsets,my_cct_offsets), SPARSE_OK, check);
   r = binarySearchCCTid(cct_ids,full_cct_offsets,my_cct_offsets);
   if(r != SPARSE_OK) return SPARSE_ERR;
 

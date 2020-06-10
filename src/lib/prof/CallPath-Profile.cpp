@@ -1042,6 +1042,7 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   // ------------------------------------------------------------
   // footer - YUMENG
   // ------------------------------------------------------------
+  /*
   size_t footer[SF_FOOTER_LENGTH];
   fseek(infs, 0, SEEK_END); 
   size_t footer_position = ftell(infs) - SF_FOOTER_SIZE;
@@ -1050,6 +1051,18 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
     hpcfmt_int8_fread(&(footer[i]), infs);
   }
   fseek(infs, footer[SF_FOOTER_hdr], SEEK_SET); 
+  */
+  hpcrun_fmt_footer_t footer;
+  fseek(infs, 0, SEEK_END); 
+  size_t footer_position = ftell(infs) - SF_footer_SIZE;
+  fseek(infs, footer_position, SEEK_SET); 
+  ret = hpcrun_fmt_footer_fread(&footer, infs);
+  if(ret != HPCFMT_OK){
+    fprintf(stderr, "ERROR: error reading footer section in '%s'\n", filename);
+    prof_abort(-1);
+  }
+  printf("hdr position from footer: %d\n", footer.hdr_offset);
+  fseek(infs, footer.hdr_offset, SEEK_SET); 
 
   // ------------------------------------------------------------
   // hdr
@@ -1078,7 +1091,8 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
   //YUMENG: no epoch info needed
   //uint num_epochs = 0;
   size_t file_cur = 0;
-  while ( !feof(infs) && (file_cur != footer[SF_FOOTER_footer])) {
+  //while ( !feof(infs) && (file_cur != footer[SF_FOOTER_footer])) {
+  while ( !feof(infs) && (file_cur != footer.footer_offset)) {
 
     Profile* myprof = NULL;
 
@@ -1109,14 +1123,20 @@ Profile::fmt_fread(Profile* &prof, FILE* infs, uint rFlags,
 
    //footer print YUMENG
    file_cur = ftell(infs);
+   /*
    if((file_cur == footer[SF_FOOTER_footer]) && outfs){
      fprintf(outfs,"[footer: \n  ");
      for(int i = 0; i < SF_FOOTER_LENGTH;i++){
        fprintf(outfs,"%ld ",footer[i]);
      }
      fprintf(outfs,"\n]\n");
+   }*/
+   if((file_cur == footer.footer_offset) && outfs){
+     hpcrun_fmt_footer_fprint(&footer, outfs, "  ");
    }
+
   }
+
 
   if (!prof) {
     prof = make(rFlags); // make an empty profile

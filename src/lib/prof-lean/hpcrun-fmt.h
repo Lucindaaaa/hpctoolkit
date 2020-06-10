@@ -592,7 +592,7 @@ hpcrun_fmt_lip_fprint(lush_lip_t* x, FILE* fs, const char* pre);
 // --------------------------------------------------------------------------
 // hpcrun_fmt_sparse_metrics_t
 // --------------------------------------------------------------------------
-struct hpcrun_fmt_sparse_metrics_t{
+typedef struct hpcrun_fmt_sparse_metrics_t{
   uint32_t tid;
   uint64_t num_vals;
   uint64_t num_cct;
@@ -605,7 +605,7 @@ struct hpcrun_fmt_sparse_metrics_t{
   uint32_t *cct_id;
   uint64_t *cct_off;
   uint32_t num_nz_cct;
-};
+}hpcrun_fmt_sparse_metrics_t;
 
 typedef struct hpcrun_fmt_sparse_metrics_t hpcrun_fmt_sparse_metrics_t;
 
@@ -622,6 +622,34 @@ hpcrun_fmt_sparse_metrics_fprint(hpcrun_fmt_sparse_metrics_t* x, FILE* fs,
 void
 hpcrun_fmt_sparse_metrics_free(hpcrun_fmt_sparse_metrics_t* x, hpcfmt_free_fn dealloc);
 
+
+// --------------------------------------------------------------------------
+// hpcrun_fmt_footer_t
+// --------------------------------------------------------------------------
+static const uint64_t HPCRUNsm = 0x48504352554E736D;
+
+typedef struct hpcrun_fmt_footer_t{
+  uint64_t hdr_offset;
+  uint64_t loadmap_offset;
+  uint64_t cct_offset;
+  uint64_t met_tbl_offset;
+  uint64_t sm_offset;
+  uint64_t footer_offset;
+  //uint32_t num_cct;
+
+  uint64_t HPCRUNsm;
+}hpcrun_fmt_footer_t;
+
+int
+hpcrun_fmt_footer_fwrite(hpcrun_fmt_footer_t* x, FILE* fs);
+
+int
+hpcrun_fmt_footer_fread(hpcrun_fmt_footer_t* x, FILE* fs);
+
+int
+hpcrun_fmt_footer_fprint(hpcrun_fmt_footer_t* x, FILE* fs, const char* pre);
+
+
 // --------------------------------------------------------------------------
 // hpcrun_sparse_file
 // --------------------------------------------------------------------------
@@ -634,14 +662,8 @@ static const int SF_END     = 0;
 static const int SF_FAIL    = 1;
 static const int SF_ERR     = -1;
 
-// ------------------------------------------------------------
-// Format of footer: array with size 7, each is 8 bytes
-//    hdr_offset       loadmap_offset      num_cct  cct_offset 
-//        0                  1                 2         3      
-// metric-tbl_offset  sparse-metrics_offset  footer_offset
-//        4                  5                      6     
-// ------------------------------------------------------------
-static const int SF_FOOTER_SIZE           = 56; 
+static const int SF_footer_SIZE           = 56; 
+/*
 static const int SF_FOOTER_LENGTH         = 7; 
 static const int SF_FOOTER_hdr            = 0; 
 static const int SF_FOOTER_lm             = 1; 
@@ -649,7 +671,7 @@ static const int SF_FOOTER_num_cct        = 2;
 static const int SF_FOOTER_cct            = 3; 
 static const int SF_FOOTER_metric_tbl     = 4; 
 static const int SF_FOOTER_sparse_metrics = 5; 
-static const int SF_FOOTER_footer         = 6; 
+static const int SF_FOOTER_footer         = 6; */
 
 static const int SF_num_lm_SIZE           = 4; 
 static const int SF_num_metric_SIZE       = 4;
@@ -665,27 +687,29 @@ static const int SF_cct_off_SIZE          = 8;
 
 typedef struct hpcrun_sparse_file {
   FILE* file;
-  size_t footer[7];
+  //size_t footer[7];
+  hpcrun_fmt_footer_t footer;
 
   //use for Pause, Resume
   bool mode;
   size_t cur_pos;
 
   //keep track for next_xx functions
-  uint32_t cur_cct;
-  size_t cur_metric;
+  uint64_t num_cct;       //should be 32-bit since cct id is 32-bit, but the original writing in cct section for num_cct is 64-bit
+  uint32_t cct_node_read;
+  size_t metric_bytes_read;
   uint16_t cur_metric_id; //count the id, metric desc doesn't have it
-  size_t cur_lm;
-  uint32_t cur_block;
+  size_t lm_bytes_read;
+  uint32_t sm_block_touched;
 
   //to read metric values for current block, initialized when hpcrun_sparse_next_block is called
   size_t cur_block_end; //in terms of number of nzvals 
   size_t cur_block_start;//in terms of number of nzvals 
   uint64_t num_nzval;
-  //size_t metric_pos_offset;
+  uint32_t num_nz_cct;
   size_t cct_offset_offset;
   size_t val_mid_offset;
-  uint32_t num_nz_cct;
+  
 
 } hpcrun_sparse_file_t;
 

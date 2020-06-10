@@ -974,7 +974,7 @@ hpcrun_fmt_footer_fread(hpcrun_fmt_footer_t* x, FILE* fs)
   HPCFMT_ThrowIfError(hpcfmt_int8_fread(&x->HPCRUNsm,fs));
 
   if(x->HPCRUNsm != HPCRUNsm){
-    fprintf(stderr, "ERROR: hpcrun output file is incomplete due to wrong HPCRUNsm! Value read: %ld, expected: %ld\n", x->HPCRUNsm, HPCRUNsm);
+    fprintf(stderr, "ERROR: hpcrun output file is incomplete due to wrong HPCRUNsm! Value read: 0x%" PRIx64 ", expected: 0x%" PRIx64 "\n", x->HPCRUNsm, HPCRUNsm);
     return HPCFMT_ERR;
   }
 
